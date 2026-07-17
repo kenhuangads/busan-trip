@@ -424,7 +424,8 @@
           !state.sel.has(f.id) && !suggested.has(f.id) &&
           (f.flex || [f.cluster]).includes(day.cluster) &&
           (ACCEPT[slotKey] || []).includes(f.slot) &&
-          (!filter || filter(f)));
+          (!filter || filter(f)))
+          .sort((a, b) => (b.rec || 0) - (a.rec || 0) || a._idx - b._idx); // 補位取推薦度最高者
         if (cand.length) { suggested.add(cand[0].id); day.slots[slotKey] = { item: cand[0], suggest: true }; }
       };
       const d1 = days[0], d5 = days[4];
@@ -597,9 +598,9 @@
     else list = state.shopCat === 'all' ? SHOPS : SHOPS.filter(s => s.cat === state.shopCat);
     if (state.region !== 'all') list = list.filter(i => (i.flex || [i.cluster]).includes(state.region));
     list = list.slice();
-    if (state.sort === 'price') list.sort((a, b) => (a.est || 0) - (b.est || 0));
-    else if (state.sort === 'dist') list.sort((a, b) => a._km - b._km);
-    else list.sort((a, b) => a._idx - b._idx);
+    if (state.sort === 'price') list.sort((a, b) => (a.est || 0) - (b.est || 0) || a._idx - b._idx);
+    else if (state.sort === 'dist') list.sort((a, b) => a._km - b._km || a._idx - b._idx);
+    else list.sort((a, b) => (b.rec || 0) - (a.rec || 0) || a._idx - b._idx); // 推薦度：跨分類混排
     $('#grid').innerHTML = list.map(cardHtml).join('') ||
       '<p class="empty">此分類目前沒有符合區域篩選的項目</p>';
   }
@@ -878,30 +879,73 @@
   }
 
   /* ---------- Google 試算表匯出／同步 ---------- */
+  const GF_FORMULA = "=ARRAYFORMULA(SPLIT(TRANSPOSE(SPLIT(INDEX('表單回應 1'!B:B, COUNTA('表單回應 1'!B:B)), CHAR(10), TRUE, FALSE)), CHAR(9), TRUE, FALSE))";
+
+  function parseFormLink(link) {
+    const m = String(link || '').match(/forms\/d\/e\/([\w-]+)\//);
+    const e = String(link || '').match(/[?&]entry\.(\d+)=/);
+    if (!m || !e) return null;
+    return { action: `https://docs.google.com/forms/d/e/${m[1]}/formResponse`, entry: 'entry.' + e[1] };
+  }
+
   function sheetModalHtml() {
-    let url = '';
-    try { url = localStorage.getItem('busan_gs_url') || ''; } catch (e) {}
+    let gsUrl = '', gfUrl = '';
+    try {
+      gsUrl = localStorage.getItem('busan_gs_url') || '';
+      gfUrl = localStorage.getItem('busan_gf_url') || '';
+    } catch (e) {}
     return `
     <div class="modal-mask no-print" id="gsMask" style="display:none">
       <div class="modal">
         <button class="m-close" id="gsClose">✕</button>
         <h3>📊 同步到 Google 試算表</h3>
-        <p class="m-hint"><b>方法一（最快）：</b>複製 TSV 後，到 Google 試算表選 A1 按 Ctrl/Cmd+V 貼上，會自動分欄。</p>
+        <p class="m-hint"><b>方法一（最快・零設定）：</b>複製 TSV 後，到 Google 試算表選 A1 按 Ctrl/Cmd+V 貼上，會自動分欄。</p>
         <button id="tsvBtn" class="m-btn">📋 複製 TSV 行程表（${esc(curVersionName())}）</button>
         <hr>
-        <p class="m-hint"><b>方法二（雲端一鍵同步）：</b>一次性設定 Apps Script 後，之後每個版本按一下就同步成試算表裡的一個工作表，方便比較與挑選版本。</p>
-        <input id="gsUrl" placeholder="貼上 Apps Script 網址 https://script.google.com/macros/s/…/exec" value="${esc(url)}">
+        <p class="m-hint"><b>方法二（推薦・免授權雲端同步）：</b>用 Google 表單當橋樑，<b>完全不經過應用程式授權</b>，不會出現「This app is blocked」。每按一次同步，就在試算表新增一列版本紀錄。</p>
+        <input id="gfUrl" placeholder="貼上表單「預先填入的連結」 https://docs.google.com/forms/d/e/…/viewform?…entry.123=…" value="${esc(gfUrl)}">
+        <div class="m-row">
+          <button id="gfSave" class="m-btn">儲存連結</button>
+          <button id="gfSync" class="m-btn go">☁️ 立即同步目前版本</button>
+        </div>
+        <div id="gfStatus" class="gs-status"></div>
+        <details>
+          <summary>📖 表單同步 一次性設定教學（約 2 分鐘・不會被封鎖）</summary>
+          <ol>
+            <li>到 <a href="https://forms.google.com" target="_blank" rel="noopener">forms.google.com</a> 建立空白表單，新增 1 題「<b>段落</b>」題型（題目名稱隨意，例如「行程資料」）</li>
+            <li>切到「回應」分頁 → 點試算表圖示「連結至試算表」→ 建立試算表</li>
+            <li>表單右上「⋮」→「<b>取得預先填入的連結</b>」→ 在題目裡隨便打幾個字 → 底部「取得連結」→「複製連結」</li>
+            <li>把連結貼到上方欄位 → 按「儲存連結」即完成設定</li>
+            <li>之後每次按「立即同步」，該版本就會寫入試算表「表單回應 1」的新一列（B 欄，含版本名稱）</li>
+            <li>想攤開成表格：在試算表新增一個分頁，於 A1 貼上下方公式（自動顯示<b>最新同步</b>的版本；想看舊版把公式裡的 COUNTA(...) 改成該列號即可）</li>
+          </ol>
+<pre id="gfFormula">${esc(GF_FORMULA)}</pre>
+          <button id="gfFormulaCopy" class="m-btn">複製公式</button>
+        </details>
+        <hr>
+        <p class="m-hint"><b>方法三（進階）Apps Script：</b>每個版本同步成試算表裡「一個工作表」，格式最漂亮，但部署時需要授權自建應用程式。</p>
+        <input id="gsUrl" placeholder="貼上 Apps Script 網址 https://script.google.com/macros/s/…/exec" value="${esc(gsUrl)}">
         <div class="m-row">
           <button id="gsSave" class="m-btn">儲存網址</button>
           <button id="gsSync" class="m-btn go">☁️ 立即同步目前版本</button>
         </div>
         <div id="gsStatus" class="gs-status"></div>
         <details>
+          <summary>⚠️ 授權時出現「This app is blocked」？</summary>
+          <ol>
+            <li><b>原因：</b>你的 Google 帳戶開啟了「強化的安全瀏覽」（或進階保護），Google 會直接封鎖「未驗證的自建應用程式」授權，連「進階→仍要前往」的選項都不給。</li>
+            <li>開 <a href="https://myaccount.google.com/security" target="_blank" rel="noopener">myaccount.google.com/security</a> → 找到「強化的安全瀏覽」→ <b>暫時關閉</b>，等約 5 分鐘</li>
+            <li>回 Apps Script 重新「部署」→ 授權畫面改出現「Google 尚未驗證這個應用程式」→ 點「<b>進階</b>」→「<b>前往 ○○（不安全）</b>」→ 允許（這是你自己寫的程式，安全無虞）</li>
+            <li>完成後可把「強化的安全瀏覽」重新開啟，之後同步不需再授權</li>
+            <li>若是公司／學校帳號被管理員政策封鎖，或不想動安全設定 → 請直接改用<b>方法二</b>（免授權）</li>
+          </ol>
+        </details>
+        <details>
           <summary>📖 Apps Script 一次性設定教學（約 3 分鐘）</summary>
           <ol>
             <li>開一個 Google 試算表 → 上方選單「擴充功能」→「Apps Script」</li>
             <li>刪掉預設內容，貼上下方程式碼並儲存</li>
-            <li>右上「部署」→「新增部署」→ 類型選「網路應用程式」→ 執行身分「我」、存取權「任何人」→ 部署</li>
+            <li>右上「部署」→「新增部署」→ 類型選「網路應用程式」→ 執行身分「我」、存取權「任何人」→ 部署（授權時見上方排解）</li>
             <li>複製產生的網址（…/exec）貼到上面欄位 → 按「儲存網址」</li>
             <li>之後每次按「立即同步」，目前版本就會寫入同名工作表</li>
           </ol>
@@ -926,6 +970,44 @@
       const tsv = buildRows(plan).map(r => r.join('\t')).join('\n');
       copyToClipboard(tsv, '#tsvBtn', '✅ 已複製！到試算表按 Ctrl/Cmd+V 貼上');
     });
+
+    /* 方法二：Google 表單免授權同步 */
+    $('#gfSave').addEventListener('click', () => {
+      const url = $('#gfUrl').value.trim();
+      const st = $('#gfStatus');
+      if (url && !parseFormLink(url)) {
+        st.textContent = '⚠️ 這不像「預先填入的連結」：請照教學第 3 步取得（網址需含 /forms/d/e/…/viewform 與 entry.數字=）';
+        return;
+      }
+      try { localStorage.setItem('busan_gf_url', url); } catch (e) {}
+      st.textContent = url ? '✅ 已儲存，之後按「立即同步」即可' : '已清除連結';
+    });
+    $('#gfSync').addEventListener('click', () => {
+      let url = '';
+      try { url = (localStorage.getItem('busan_gf_url') || '').trim(); } catch (e) {}
+      if (!url) url = $('#gfUrl').value.trim();
+      const st = $('#gfStatus');
+      const f = parseFormLink(url);
+      if (!f) {
+        st.textContent = '⚠️ 請先照教學取得表單「預先填入的連結」並儲存';
+        return;
+      }
+      st.textContent = '☁️ 同步中…';
+      const vName = curVersionName();
+      const payload = `版本\t${vName}\n` + buildRows(plan).map(r => r.join('\t')).join('\n');
+      fetch(f.action, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `${f.entry}=${encodeURIComponent(payload)}&fvv=1&pageHistory=0`
+      }).then(() => {
+        st.textContent = `✅ 已送出「${vName}」！開啟表單連結的試算表，「表單回應 1」會多一列（貼上教學裡的公式即可攤開成表格）`;
+      }).catch(() => {
+        st.textContent = '❌ 送出失敗，請檢查連結與網路後再試';
+      });
+    });
+    $('#gfFormulaCopy').addEventListener('click', () => copyToClipboard(GF_FORMULA, '#gfFormulaCopy', '✅ 已複製公式'));
+
+    /* 方法三：Apps Script */
     $('#gsSave').addEventListener('click', () => {
       const url = $('#gsUrl').value.trim();
       try { localStorage.setItem('busan_gs_url', url); } catch (e) {}
