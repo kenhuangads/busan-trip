@@ -912,7 +912,7 @@
         <details>
           <summary>📖 表單同步 一次性設定教學（約 2 分鐘・不會被封鎖）</summary>
           <ol>
-            <li>到 <a href="https://forms.google.com" target="_blank" rel="noopener">forms.google.com</a> 建立空白表單，新增 1 題「<b>段落</b>」題型（題目名稱隨意，例如「行程資料」）</li>
+            <li>到 <a href="https://forms.google.com" target="_blank" rel="noopener">forms.google.com</a> 建立空白表單，新增 1 題「<b>詳答</b>」題型（多行文字；題目名稱隨意，例如「行程資料」）</li>
             <li>切到「回應」分頁 → 點試算表圖示「連結至試算表」→ 建立試算表</li>
             <li>表單右上「⋮」→「<b>取得預先填入的連結</b>」→ 在題目裡隨便打幾個字 → 底部「取得連結」→「複製連結」</li>
             <li>把連結貼到上方欄位 → 按「儲存連結」即完成設定</li>
