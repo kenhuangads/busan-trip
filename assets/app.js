@@ -879,7 +879,8 @@
   }
 
   /* ---------- Google 試算表匯出／同步 ---------- */
-  const GF_FORMULA = "=ARRAYFORMULA(SPLIT(TRANSPOSE(SPLIT(INDEX('表單回應 1'!B:B, COUNTA('表單回應 1'!B:B)), CHAR(10), TRUE, FALSE)), CHAR(9), TRUE, FALSE))";
+  // 不含分頁名稱：直接貼在回應分頁的 D1，不受「表單回應/回覆 1」翻譯差異影響
+  const GF_FORMULA = "=ARRAYFORMULA(SPLIT(TRANSPOSE(SPLIT(INDEX(B:B, COUNTA(B:B)), CHAR(10), TRUE, FALSE)), CHAR(9), TRUE, FALSE))";
 
   function parseFormLink(link) {
     const m = String(link || '').match(/forms\/d\/e\/([\w-]+)\//);
@@ -916,8 +917,8 @@
             <li>切到「回應」分頁 → 點試算表圖示「連結至試算表」→ 建立試算表</li>
             <li>表單右上「⋮」→「<b>取得預先填入的連結</b>」→ 在題目裡隨便打幾個字 → 底部「取得連結」→「複製連結」</li>
             <li>把連結貼到上方欄位 → 按「儲存連結」即完成設定</li>
-            <li>之後每次按「立即同步」，該版本就會寫入試算表「表單回應 1」的新一列（B 欄，含版本名稱）</li>
-            <li>想攤開成表格：在試算表新增一個分頁，於 A1 貼上下方公式（自動顯示<b>最新同步</b>的版本；想看舊版把公式裡的 COUNTA(...) 改成該列號即可）</li>
+            <li>之後每次按「立即同步」，該版本就會寫入試算表回應分頁（如「表單回覆 1」）的新一列（B 欄，含版本名稱）</li>
+            <li>想攤開成表格：到<b>回應分頁</b>點 <b>D1</b> 貼上下方公式，表格會攤在右側並自動顯示<b>最新同步</b>的版本（公式不含分頁名稱，不受「回應／回覆」翻譯差異影響；想看舊版把 COUNTA(B:B) 改成該列號即可）</li>
           </ol>
 <pre id="gfFormula">${esc(GF_FORMULA)}</pre>
           <button id="gfFormulaCopy" class="m-btn">複製公式</button>
@@ -1000,7 +1001,7 @@
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `${f.entry}=${encodeURIComponent(payload)}&fvv=1&pageHistory=0`
       }).then(() => {
-        st.textContent = `✅ 已送出「${vName}」！開啟表單連結的試算表，「表單回應 1」會多一列（貼上教學裡的公式即可攤開成表格）`;
+        st.textContent = `✅ 已送出「${vName}」！開啟表單連結的試算表，回應分頁會多一列（在該分頁 D1 貼上教學裡的公式即可攤開成表格）`;
       }).catch(() => {
         st.textContent = '❌ 送出失敗，請檢查連結與網路後再試';
       });
