@@ -144,7 +144,7 @@ const FOODS = [
     tag:'吃法多變', links:{ g:'고반식당 해운대점', n:'고반식당 해운대' } },
   { id:'f11', kind:'food', cat:'bbq', name:'百年食堂', kr:'백년식당 해운대', cluster:'east', area:'海雲台主街', slot:'dinner', est:600,
     price:'均消約NT$500-700／人（14,000₩/份）', wait:'現場候位約15-20分',
-    desc:'肥美厚實五花肉，最後以海味滿滿的章魚拉麵收尾，層次豐富，深受年輕夫妻喜愛。',
+    desc:'肥美厚實五花肉，最後以海味滿滿的章魚拉麵收尾，層次豐富，深受年輕旅人喜愛。',
     tag:'章魚拉麵收尾', links:{ g:'백년식당 해운대', n:'백년식당 해운대' } },
   /* 醬蟹・帝王蟹 */
   { id:'f12', kind:'food', cat:'crab', name:'尾浦家（미포집）醬醃海鮮', kr:'미포집', cluster:'east', area:'海雲台・尾浦', slot:'dinner', est:750,
@@ -562,3 +562,170 @@ const TRANSIT = {
 };
 
 const FLIGHT_NOTE = '航班時間以航空公司最終公告／票面為準；韓國時間比台灣快 1 小時。';
+
+/* ══════════════════════════════════════════════
+   v3 智慧排程資料：座標／停留時間／生活圈／地鐵／採購門市
+   （座標與時間皆為保守估算，供交通與時間軸試算參考）
+   ══════════════════════════════════════════════ */
+
+const HOTEL = { name: '釜山樂天飯店', lat: 35.1577, lng: 129.0554, zone: 'seomyeon' };
+
+/* 地鐵站序（l1/l2 = 1/2 號線站序；西面為兩線轉乘點） */
+const STATIONS = {
+  '西面': { l1: 0, l2: 17 }, '釜山站': { l1: 6 }, '中央': { l1: 7 }, '南浦': { l1: 8 }, '札嘎其': { l1: 9 },
+  '田浦': { l2: 16 }, '伽倻': { l2: 19 }, '開琴': { l2: 21 },
+  '萇山': { l2: 0 }, '海雲台': { l2: 2 }, '冬柏': { l2: 3 }, 'Centum City': { l2: 5 },
+  '水營': { l2: 6 }, '廣安': { l2: 7 }, '南川': { l2: 9 }
+};
+
+/* 生活圈：最近地鐵站＋步行分鐘（st:null＝該區以計程車／公車為主） */
+const ZONES = {
+  seomyeon:     { st: '西面', walk: 6,  cluster: 'seomyeon' },
+  jeonpo:       { st: '田浦', walk: 5,  cluster: 'seomyeon' },
+  gaegeum:      { st: '開琴', walk: 4,  cluster: 'seomyeon' },
+  gaya:         { st: '伽倻', walk: 5,  cluster: 'seomyeon' },
+  nampo:        { st: '南浦', walk: 4,  cluster: 'nampo' },
+  jagalchi:     { st: '札嘎其', walk: 4, cluster: 'nampo' },
+  jungang:      { st: '中央', walk: 4,  cluster: 'nampo' },
+  busanstation: { st: '釜山站', walk: 3, cluster: 'nampo' },
+  gamcheon:     { st: null, cluster: 'nampo' },
+  songdo:       { st: null, cluster: 'nampo' },
+  yeongdo:      { st: null, cluster: 'nampo' },
+  haeundae:     { st: '海雲台', walk: 6,  cluster: 'east' },
+  mipo:         { st: '海雲台', walk: 16, cluster: 'east' },
+  haeridan:     { st: '海雲台', walk: 8,  cluster: 'east' },
+  jwadong:      { st: '萇山', walk: 8,   cluster: 'east' },
+  centum:       { st: 'Centum City', walk: 4, cluster: 'east' },
+  dongbaek:     { st: '冬柏', walk: 10,  cluster: 'east' },
+  dalmaji:      { st: null, cluster: 'east' },
+  osiria:       { st: null, cluster: 'east' },
+  gijangmkt:    { st: null, cluster: 'east' },
+  gwangan:      { st: '廣安', walk: 9,  cluster: 'gwangalli' },
+  suyeong:      { st: '水營', walk: 5,  cluster: 'gwangalli' },
+  namcheon:     { st: '南川', walk: 7,  cluster: 'gwangalli' },
+  millak:       { st: '廣安', walk: 15, cluster: 'gwangalli' }
+};
+
+/* 具體採購門市（購物項目 → 門市 → 排入每日行程） */
+const STORES = {
+  oy_seomyeon:     { name: 'Olive Young 西面旗艦店', zone: 'seomyeon', lat: 35.1575, lng: 129.0578, stay: 60, close: 1350,
+    note: '單筆滿 15,000₩ 可現場即時退稅，記得帶護照（10:00 開門）', links: { g: '올리브영 부산 서면점', n: '올리브영 부산 서면점' } },
+  lottedept:       { name: '樂天百貨 釜山本店', zone: 'seomyeon', lat: 35.1552, lng: 129.0596, stay: 75, close: 1200,
+    note: '與樂天飯店同棟連通，逛完直接回房（10:30 開門）', links: { g: '롯데백화점 부산본점', n: '롯데백화점 부산본점' } },
+  musinsa:         { name: 'MUSINSA STANDARD 西面旗艦店', zone: 'seomyeon', lat: 35.1568, lng: 129.0645, stay: 45, close: 1290,
+    links: { g: '무신사 스탠다드 서면', n: '무신사 스탠다드 서면' } },
+  seomyeon_street: { name: '西面商圈街區（地下街／ALAND／品牌街）', zone: 'seomyeon', lat: 35.1570, lng: 129.0590, stay: 60, close: 1290,
+    links: { g: '서면 지하상가', n: '서면 지하상가' } },
+  cvs:             { name: '飯店周邊超商（GS25／CU）', zone: 'seomyeon', lat: 35.1575, lng: 129.0560, stay: 10, close: 1440,
+    note: '香蕉牛奶當地喝最讚（液體不可手提上機）', links: { g: 'GS25 서면' } },
+  shinsegae:       { name: '新世界百貨 Centum City', zone: 'centum', lat: 35.1691, lng: 129.1306, stay: 90, close: 1200,
+    note: '金氏認證全球最大百貨，與 Spa Land 同棟（10:30 開門）', links: { g: '신세계백화점 센텀시티', n: '신세계백화점 센텀시티' } },
+  lottemart:       { name: '樂天超市 光復店', zone: 'nampo', lat: 35.0979, lng: 129.0364, stay: 60, close: 1320,
+    note: '南浦站直結、可退稅；零食泡麵泡菜一次掃齊', links: { g: '롯데마트 광복점', n: '롯데마트 광복점' } },
+  kakao:           { name: 'Kakao Friends 南浦旗艦店', zone: 'nampo', lat: 35.0990, lng: 129.0306, stay: 30, close: 1260,
+    links: { g: '카카오프렌즈 부산 남포', n: '카카오프렌즈 남포' } },
+  nampo_street:    { name: '光復路時尚街（FILA 等）', zone: 'nampo', lat: 35.0988, lng: 129.0295, stay: 45, close: 1260,
+    links: { g: '광복로 문화패션거리', n: '광복로 패션거리' } },
+  busan_stn:       { name: '釜山站 2樓伴手禮區', zone: 'busanstation', lat: 35.1151, lng: 129.0413, stay: 20, close: 1260,
+    note: '南浦回西面的地鐵 1 號線途中站，可順路下車', links: { g: '부산역', n: '부산역' } },
+  badasand:        { name: 'Busan Bada Sand 海雲台本店', zone: 'haeundae', lat: 35.1611, lng: 129.1618, stay: 15, close: 1200,
+    links: { g: '부산바다샌드 해운대', n: '부산바다샌드' } },
+  samyeong:        { name: 'SAM YEONG JUBANG 海雲台門市', zone: 'haeundae', lat: 35.1620, lng: 129.1640, stay: 25, close: 1140,
+    links: { g: '삼영주방 해운대', n: '삼영주방' } },
+  luft:            { name: 'Luft Mansion 海雲台門市', zone: 'haeundae', lat: 35.1618, lng: 129.1633, stay: 25, close: 1140,
+    links: { g: '루프트맨션 해운대', n: '루프트맨션' } },
+  heema:           { name: 'HEEMA STORE 廣安里本店', zone: 'gwangan', lat: 35.1537, lng: 129.1177, stay: 20, close: 1200,
+    links: { g: '히마스토어 광안리', n: '히마스토어' } },
+  clamsand:        { name: 'Clam Sand Busan 門市（南浦）', zone: 'nampo', lat: 35.0995, lng: 129.0300, stay: 15, close: 1140,
+    links: { g: '클램샌드 부산', n: '클램샌드 부산' } },
+  mirukku:         { name: 'Mirukku Coffee 門市（南浦）', zone: 'nampo', lat: 35.1000, lng: 129.0310, stay: 15, close: 1140,
+    links: { g: '미루쿠커피', n: '미루쿠커피' } }
+};
+
+/* 各項目補充：座標／生活圈／建議停留分鐘（含排隊與緩衝的保守值）；購物項目 → 門市 */
+const META = {
+  s01: { lat: 35.1580, lng: 129.1727, zone: 'mipo',     stay: 150 },
+  s02: { lat: 35.1587, lng: 129.1707, zone: 'mipo',     stay: 90 },
+  s03: { lat: 35.1883, lng: 129.2231, zone: 'osiria',   stay: 90 },
+  s04: { lat: 35.1938, lng: 129.2124, zone: 'osiria',   stay: 120 },
+  s05: { lat: 35.0975, lng: 129.0108, zone: 'gamcheon', stay: 150 },
+  s06: { lat: 35.0762, lng: 129.0234, zone: 'songdo',   stay: 120 },
+  s07: { lat: 35.1565, lng: 129.1520, zone: 'dongbaek', stay: 120 },
+  s08: { lat: 35.0971, lng: 129.0289, zone: 'jagalchi', stay: 150 },
+  s09: { lat: 35.1691, lng: 129.1298, zone: 'centum',   stay: 180 },
+  s10: { lat: 35.1565, lng: 129.1520, zone: 'dongbaek', stay: 90 },
+  f01: { lat: 35.1557, lng: 129.0605, zone: 'seomyeon', stay: 60 },
+  f02: { lat: 35.1622, lng: 129.1602, zone: 'haeundae', stay: 60 },
+  f03: { lat: 35.1520, lng: 129.1130, zone: 'suyeong',  stay: 75 },
+  f04: { lat: 35.1585, lng: 129.1693, zone: 'mipo',     stay: 60 },
+  f05: { lat: 35.1367, lng: 129.1080, zone: 'namcheon', stay: 80 },
+  f06: { lat: 35.0990, lng: 129.0322, zone: 'nampo',    stay: 60 },
+  f07: { lat: 35.1562, lng: 129.0572, zone: 'seomyeon', stay: 100 },
+  f08: { lat: 35.1550, lng: 129.0640, zone: 'jeonpo',   stay: 90 },
+  f09: { lat: 35.0982, lng: 129.0330, zone: 'nampo',    stay: 90 },
+  f10: { lat: 35.1632, lng: 129.1612, zone: 'haeundae', stay: 90 },
+  f11: { lat: 35.1626, lng: 129.1616, zone: 'haeundae', stay: 90 },
+  f12: { lat: 35.1580, lng: 129.1712, zone: 'mipo',     stay: 100 },
+  f13: { lat: 35.1532, lng: 129.1200, zone: 'gwangan',  stay: 90 },
+  f14: { lat: 35.1454, lng: 129.1128, zone: 'suyeong',  stay: 90 },
+  f15: { lat: 35.1948, lng: 129.2112, zone: 'osiria',   stay: 90 },
+  f16: { lat: 35.2446, lng: 129.2221, zone: 'gijangmkt', stay: 100 },
+  f17: { lat: 35.1490, lng: 129.0208, zone: 'gaegeum',  stay: 55 },
+  f18: { lat: 35.1535, lng: 129.0345, zone: 'gaya',     stay: 55 },
+  f19: { lat: 35.1035, lng: 129.0332, zone: 'jungang',  stay: 60 },
+  f20: { lat: 35.1631, lng: 129.1589, zone: 'haeundae', stay: 55 },
+  f21: { lat: 35.0987, lng: 129.0292, zone: 'nampo',    stay: 55 },
+  f22: { lat: 35.0968, lng: 129.0292, zone: 'jagalchi', stay: 90 },
+  f23: { lat: 35.1029, lng: 129.0347, zone: 'jungang',  stay: 90 },
+  f24: { lat: 35.1634, lng: 129.1621, zone: 'haeundae', stay: 100 },
+  f25: { lat: 35.0977, lng: 129.0260, zone: 'jagalchi', stay: 90 },
+  f26: { lat: 35.1688, lng: 129.1754, zone: 'jwadong',  stay: 90 },
+  f27: { lat: 35.0800, lng: 129.0698, zone: 'yeongdo',  stay: 75 },
+  f28: { lat: 35.1531, lng: 129.1188, zone: 'gwangan',  stay: 60 },
+  f29: { lat: 35.2210, lng: 129.2245, zone: 'gijangmkt', stay: 70 },
+  f30: { lat: 35.1594, lng: 129.1770, zone: 'dalmaji',  stay: 70 },
+  f31: { lat: 35.1555, lng: 129.1268, zone: 'millak',   stay: 70 },
+  f32: { lat: 35.1524, lng: 129.1178, zone: 'gwangan',  stay: 75 },
+  f33: { lat: 35.1536, lng: 129.1222, zone: 'gwangan',  stay: 75 },
+  f34: { lat: 35.1552, lng: 129.0652, zone: 'jeonpo',   stay: 75 },
+  f35: { lat: 35.1519, lng: 129.1191, zone: 'gwangan',  stay: 75 },
+  f36: { lat: 35.1517, lng: 129.1210, zone: 'gwangan',  stay: 75 },
+  f37: { lat: 35.1541, lng: 129.1181, zone: 'gwangan',  stay: 45 },
+  f38: { lat: 35.1662, lng: 129.1591, zone: 'haeridan', stay: 40 },
+  f39: { lat: 35.1590, lng: 129.1898, zone: 'dalmaji',  stay: 60 },
+  f40: { lat: 35.0985, lng: 129.0281, zone: 'nampo',    stay: 45 },
+  f41: { lat: 35.1656, lng: 129.1586, zone: 'haeridan', stay: 30 },
+  f42: { lat: 35.1629, lng: 129.1601, zone: 'haeundae', stay: 30 },
+  f43: { lat: 35.0983, lng: 129.0277, zone: 'nampo',    stay: 20 },
+  f44: { lat: 35.0975, lng: 129.0212, zone: 'jagalchi', stay: 30 },
+  f45: { lat: 35.1572, lng: 129.0592, zone: 'seomyeon', stay: 40 },
+  f46: { lat: 35.1578, lng: 129.0601, zone: 'seomyeon', stay: 70 },
+  p01: { store: 'badasand' },   p02: { store: 'busan_stn' }, p03: { store: 'oy_seomyeon' },
+  p04: { store: 'heema' },      p05: { store: 'clamsand' },  p06: { store: 'mirukku' },
+  p07: { store: 'lottedept' },  p08: { store: 'lottemart' }, p09: { store: 'lottemart' },
+  p10: { store: 'lottemart' },  p11: { store: 'oy_seomyeon' }, p12: { store: 'oy_seomyeon' },
+  p13: { store: 'oy_seomyeon' }, p14: { store: 'oy_seomyeon' }, p15: { store: 'oy_seomyeon' },
+  p16: { store: 'oy_seomyeon' }, p17: { store: 'oy_seomyeon' }, p18: { store: 'oy_seomyeon' },
+  p19: { store: 'oy_seomyeon' }, p20: { store: 'oy_seomyeon' }, p21: { store: 'oy_seomyeon' },
+  p22: { store: 'oy_seomyeon' }, p23: { store: 'shinsegae' },  p24: { store: 'lottemart' },
+  p25: { store: 'samyeong' },   p26: { store: 'luft' },       p27: { store: 'lottemart' },
+  p28: { store: 'kakao' },      p29: { store: 'lottemart' },  p30: { store: 'seomyeon_street' },
+  p31: { store: 'lottedept' },  p32: { store: 'lottedept' },  p33: { store: 'musinsa' },
+  p34: { store: 'seomyeon_street' }, p35: { store: 'shinsegae' }, p36: { store: 'seomyeon_street' },
+  p37: { store: 'seomyeon_street' }, p38: { store: 'shinsegae' }, p39: { store: 'seomyeon_street' },
+  p40: { store: 'nampo_street' }, p41: { store: 'shinsegae' }, p42: { store: 'shinsegae' },
+  p43: { store: 'shinsegae' },  p44: { store: 'shinsegae' },  p45: { store: 'shinsegae' },
+  p46: { store: 'shinsegae' },  p47: { store: 'seomyeon_street' }, p48: { store: 'seomyeon_street' },
+  p49: { store: 'seomyeon_street' }, p50: { store: 'lottedept' }, p51: { store: 'oy_seomyeon' },
+  p52: { store: 'lottemart' },  p53: { store: 'lottemart' },  p54: { store: 'lottemart' },
+  p55: { store: 'lottemart' },  p56: { store: 'lottemart' },  p57: { store: 'lottemart' },
+  p58: { store: 'lottemart' },  p59: { store: 'cvs' },        p60: { store: 'lottemart' }
+};
+
+/* 免費散步錨點的座標與停留 */
+const ANCHOR_META = {
+  seomyeon:  { lat: 35.1554, lng: 129.0642, zone: 'jeonpo',   stay: 60 },
+  east:      { lat: 35.1587, lng: 129.1604, zone: 'haeundae', stay: 60 },
+  gwangalli: { lat: 35.1533, lng: 129.1187, zone: 'gwangan',  stay: 60 },
+  nampo:     { lat: 35.0983, lng: 129.0277, zone: 'nampo',    stay: 90 }
+};
