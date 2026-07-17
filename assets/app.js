@@ -61,15 +61,30 @@
     fromShare: false
   };
 
-  function linkRow(links) {
-    if (!links) return '';
+  const gimg = q => 'https://www.google.com/search?udm=2&q=' + encodeURIComponent(q); // Google 圖片搜尋
+  function linkRow(links, imgQuery) {
+    if (!links && !imgQuery) return '';
+    links = links || {};
     const a = [];
     if (links.g) a.push(`<a href="${gmap(links.g)}" target="_blank" rel="noopener">📍 Google地圖</a>`);
+    if (links.zh) a.push(`<a href="${esc(links.zh)}" target="_blank" rel="noopener">🇹🇼 繁中介紹</a>`);
     if (links.o) a.push(`<a href="${esc(links.o)}" target="_blank" rel="noopener">🌐 官網／介紹</a>`);
     if (links.s) a.push(`<a href="${gsearch(links.s)}" target="_blank" rel="noopener">🔎 商品介紹</a>`);
+    if (imgQuery) a.push(`<a href="${gimg(imgQuery)}" target="_blank" rel="noopener">📷 實景圖片</a>`);
     if (links.n) a.push(`<a href="${nmap(links.n)}" target="_blank" rel="noopener">🗺️ NAVER</a>`);
     return `<div class="links" onclick="event.stopPropagation()">${a.join('')}</div>`;
   }
+  // 圖片搜尋關鍵字：優先用韓文店名／商品名，最準確
+  const imgQ = it => {
+    if (it.kr) return it.kr;
+    const L = it.links || {};
+    if (L.s) return L.s;
+    if (L.o) { // 從 Olive Young 等搜尋連結取出商品關鍵字
+      const m = L.o.match(/[?&](?:query|keyword)=([^&]+)/);
+      if (m) { try { return decodeURIComponent(m[1]); } catch (e) {} }
+    }
+    return it.kind === 'shop' ? it.name : (L.g || it.name);
+  };
 
   function catInfo(it) {
     if (it.kind === 'spot') return { label: '景點', icon: '🗼' };
@@ -587,7 +602,7 @@
       <div class="meta sub">📌 ${esc(it.area || it.buy || '')}</div>
       ${priceLine}${waitLine}${it.area ? buyLine : ''}${extraLine}
       <p class="desc">${esc(it.desc)}</p>
-      ${linkRow(it.links)}
+      ${linkRow(it.links, imgQ(it))}
     </div>`;
   }
 
@@ -681,20 +696,20 @@
         <div class="e-name">🛍️ ${esc(g.store.name)} <span class="stay">⏳ 停留約${durTxt(r.stay)}</span></div>
         <div class="store-items">${g.items.map(it => `<span>☐ ${esc(it.name)}</span>`).join('')}</div>
         ${g.store.note ? `<div class="store-note">💡 ${esc(g.store.note)}</div>` : ''}${lateWarn}
-        ${linkRow(g.store.links)}`, 'storestop');
+        ${linkRow(g.store.links, g.store.links && g.store.links.g)}`, 'storestop');
     }
     if (r.k === 'd5shop') {
       if (!r.stores) {
         return entryHtml(fmtT(r.t), SLOT_LABELS.d5shop, `
           <div class="e-name">🛍️ 西面最後採購：Olive Young 旗艦店＋樂天百貨／樂天超市 <span class="stay">⏳ 約${durTxt(r.stay)}</span></div>
           <div class="e-desc">美妝、伴手禮最後掃貨並辦理退稅（同店單筆滿 15,000₩ 即可退），採買完回飯店打包行李</div>
-          ${linkRow({ g: '올리브영 부산 서면점', n: '롯데백화점 부산본점' })}`, 'storestop');
+          ${linkRow({ g: '올리브영 부산 서면점', n: '롯데백화점 부산본점' }, '올리브영 부산 서면점')}`, 'storestop');
       }
       const inner = r.stores.map(g => `
         <div class="store-b"><b>🛍️ ${esc(g.store.name)}</b>
           <div class="store-items">${g.items.map(it => `<span>☐ ${esc(it.name)}</span>`).join('')}</div>
           ${g.store.note ? `<div class="store-note">💡 ${esc(g.store.note)}</div>` : ''}
-          ${linkRow(g.store.links)}</div>`).join('');
+          ${linkRow(g.store.links, g.store.links && g.store.links.g)}</div>`).join('');
       return entryHtml(fmtT(r.t), SLOT_LABELS.d5shop, `
         <div class="e-name">🛒 西面最終採購（${r.stores.reduce((s, g) => s + g.items.length, 0)} 項）<span class="stay">⏳ 合計約${durTxt(r.stay)}</span></div>
         ${inner}
@@ -707,7 +722,7 @@
       const a = cell.anchor;
       return entryHtml(fmtT(r.t), label, `
         <div class="e-name">${a.shopping ? '🛍️' : '🚶'} ${esc(a.name)} <span class="badge free">${a.shopping ? '採購時間' : '免費散步'}</span> <span class="stay">⏳ 約${durTxt(r.stay)}</span></div>
-        <div class="e-desc">${esc(a.desc)}</div>${linkRow(a.links)}`);
+        <div class="e-desc">${esc(a.desc)}</div>${linkRow(a.links, a.links && a.links.g)}`);
     }
     const it = cell.item;
     const ci = catInfo(it);
@@ -718,7 +733,7 @@
         <span class="stay">⏳ 停留約${durTxt(r.stay)}</span></div>
       <div class="e-meta">📌 ${esc(it.area || '')} ｜ 💰 ${esc(it.price || '')}</div>
       ${it.wait ? `<div class="e-meta sub">⏱ ${esc(it.wait)}</div>` : ''}
-      <div class="e-desc">${esc(it.desc)}</div>${linkRow(it.links)}`);
+      <div class="e-desc">${esc(it.desc)}</div>${linkRow(it.links, imgQ(it))}`);
   }
 
   function versionBarHtml() {
@@ -744,7 +759,7 @@
       const backup = d.backup.length ? `
         <div class="backup"><b>⏸ 同區備選（時間排不下，可自行替換）</b>${d.backup.map(it => {
           const ci = catInfo(it);
-          return `<div class="bk-item">${ci.icon} ${esc(it.name)}｜💰 ${esc(it.price || '')} ${linkRow(it.links)}</div>`;
+          return `<div class="bk-item">${ci.icon} ${esc(it.name)}｜💰 ${esc(it.price || '')} ${linkRow(it.links, imgQ(it))}</div>`;
         }).join('')}</div>` : '';
       const dayTips = {
         d1: '🌕 ' + CONFIG.holidayNote,
@@ -795,7 +810,7 @@
             const ci = catInfo(it);
             const safeTxt = it.safe === 'warn' ? '<span class="badge warn">⚠️ 成分含肉禁帶</span>' :
               it.safe === 'ok-check' ? '<span class="badge note">須託運</span>' : '';
-            return `<div class="shop-item"><div><b>${ci.icon} ${esc(it.name)}</b> ${safeTxt}<div class="e-meta sub">🏬 ${esc(it.buy)}｜💰 ${esc(it.price)}</div></div>${linkRow(it.links)}</div>`;
+            return `<div class="shop-item"><div><b>${ci.icon} ${esc(it.name)}</b> ${safeTxt}<div class="e-meta sub">🏬 ${esc(it.buy)}｜💰 ${esc(it.price)}</div></div>${linkRow(it.links, imgQ(it))}</div>`;
           }).join('')}</div>`;
         }).join('')}
         <div class="tip customs">🛃 <b>台灣海關提醒：</b>所有肉類製品（肉乾、火腿腸、含肉塊泡麵）嚴禁入境，首次查獲罰 NT$20 萬；泡菜、芝麻油、果醬等液體/發酵品必須託運；純海鮮加工品（魚糕、海苔）可安心帶。不確定就走紅線主動申報，申報不罰。</div>
