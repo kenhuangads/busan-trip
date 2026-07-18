@@ -187,7 +187,7 @@
   function transCalc(from, to) {
     const line = havKm(from, to);
     const wKm = line * 1.25;
-    if (wKm <= 0.95) {
+    if (wKm <= 1.1) {
       const mins = Math.max(2, Math.ceil(wKm / 4.2 * 60) + 2);
       return { mode: 'walk', mins, fare2: 0,
         desc: `🚶 步行約${mins}分（${kmTxt(wKm)}）`,
