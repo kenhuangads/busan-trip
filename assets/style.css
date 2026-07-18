@@ -216,6 +216,47 @@ small { color: var(--ink-3); font-weight: 400; }
 .sortlab { font-size: 12px; color: var(--ink-3); white-space: nowrap; }
 .chip.sort.on { background: var(--ocean); border-color: var(--ocean); color: #fff; }
 
+/* ── v4：工具列（智慧推薦／全部清除／草稿） ── */
+#toolrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.tool {
+  border: 1.5px solid var(--line); background: var(--card); color: var(--ink);
+  border-radius: 999px; padding: 7px 14px; font-size: 13.5px; font-weight: 700; transition: .15s;
+}
+.tool:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow); }
+.tool.go { background: linear-gradient(135deg, #1f9d63, #35bd80); border-color: transparent; color: #fff; }
+.tool.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.tool:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ── v4：行程草稿面板 ─────────────── */
+#draftpanel { margin-top: 12px; }
+.draft-wrap { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; border-left: 4px solid var(--ocean); }
+.draft-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.d-hint { font-size: 11.5px; color: var(--ink-3); flex: 1 1 240px; }
+.draft { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 0; border-top: 1px dashed var(--line); }
+.draft.on { background: #f2f8ff; border-radius: 10px; padding-left: 8px; padding-right: 8px; }
+.d-main { flex: 1 1 220px; font-size: 14px; }
+.d-main small { color: var(--ink-3); font-size: 11.5px; margin-left: 4px; }
+.d-sum { font-size: 12.3px; color: var(--ink-2); margin-top: 2px; }
+.d-act { display: flex; gap: 5px; flex-wrap: wrap; }
+.d-empty { font-size: 12.8px; color: var(--ink-3); padding: 10px 0 4px; }
+.mini {
+  border: 1.5px solid var(--line); background: #fff; color: var(--ink-2);
+  border-radius: 999px; padding: 4px 11px; font-size: 12.3px; font-weight: 700; transition: .15s;
+}
+.mini:hover { border-color: var(--ocean); color: var(--ocean); }
+.mini.go { background: var(--ocean); border-color: var(--ocean); color: #fff; }
+.mini.del:hover { border-color: var(--warn); color: var(--warn); }
+
+/* ── v4：浮動提示 ───────────────── */
+#toast {
+  position: fixed; left: 50%; bottom: 96px; transform: translate(-50%, 14px);
+  background: rgba(24, 33, 46, .95); color: #fff; font-size: 13.5px; font-weight: 600;
+  padding: 11px 18px; border-radius: 12px; max-width: min(560px, calc(100vw - 28px));
+  box-shadow: 0 8px 28px rgba(0,0,0,.28); z-index: 80; text-align: center;
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
 /* ── v3：時間軸交通／自由時間／回飯店列 ── */
 .entry.trans, .entry.free { padding: 4px 0; border-bottom: none; }
 .trans-body, .free-body { font-size: 12.5px; color: var(--ink-2); background: #eef4fb; border-radius: 9px; padding: 5px 10px; }
@@ -266,7 +307,7 @@ small { color: var(--ink-3); font-weight: 400; }
 /* ── 列印 ───────────────────────── */
 @media print {
   body { background: #fff; font-size: 12px; }
-  .no-print, #bar, .controls, #pick, .modal-mask { display: none !important; }
+  .no-print, #bar, .controls, #pick, .modal-mask, #draftpanel, #toast { display: none !important; }
   #result { display: block !important; }
   .day, .shoplist, .sc, .ov-wrap { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
   .entry.trans, .entry.free, .entry.storestop { break-inside: avoid; }

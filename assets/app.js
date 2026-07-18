@@ -58,7 +58,8 @@
     region: 'all',
     sort: 'rec',            // rec | price | dist
     autoFill: true,
-    fromShare: false
+    fromShare: false,
+    draftOpen: false
   };
 
   const gimg = q => 'https://www.google.com/search?udm=2&q=' + encodeURIComponent(q); // Google 圖片搜尋
@@ -607,7 +608,8 @@
     </div>`;
   }
 
-  function renderGrid() {
+  /* 目前篩選條件下的清單（勾選頁與智慧推薦共用同一份結果） */
+  function filteredList() {
     let list;
     if (state.tab === 'spot') list = SPOTS;
     else if (state.tab === 'food') list = state.foodCat === 'all' ? FOODS : FOODS.filter(f => f.cat === state.foodCat);
@@ -617,8 +619,130 @@
     if (state.sort === 'price') list.sort((a, b) => (a.est || 0) - (b.est || 0) || a._idx - b._idx);
     else if (state.sort === 'dist') list.sort((a, b) => a._km - b._km || a._idx - b._idx);
     else list.sort((a, b) => (b.rec || 0) - (a.rec || 0) || a._idx - b._idx); // 推薦度：跨分類混排
-    $('#grid').innerHTML = list.map(cardHtml).join('') ||
+    return list;
+  }
+
+  function renderGrid() {
+    $('#grid').innerHTML = filteredList().map(cardHtml).join('') ||
       '<p class="empty">此分類目前沒有符合區域篩選的項目</p>';
+  }
+
+  /* ---------- 智慧推薦：依目前篩選條件挑推薦度最高、且分類與區域夠分散的項目 ---------- */
+  function smartPick() {
+    const kind = state.tab;
+    const pool = filteredList().filter(it => !state.sel.has(it.id));
+    const c = counts();
+    const have = kind === 'spot' ? c.sp : kind === 'food' ? c.fo : c.sh;
+    const target = kind === 'spot' ? CONFIG.minSpots + 1
+      : kind === 'food' ? CONFIG.minFoods + 2 : 6;
+    const need = Math.max(2, target - have); // 已達標時仍補 2 個候選
+    // 已勾選項目的分類／區域分布 → 避免推薦後過度集中
+    const catCount = {}, clCount = {};
+    const bump = (o, k) => { o[k] = (o[k] || 0) + 1; };
+    ALL.forEach(it => {
+      if (!state.sel.has(it.id) || it.kind !== kind) return;
+      bump(catCount, it.cat || 'spot');
+      (it.flex || [it.cluster]).forEach(cl => bump(clCount, cl));
+    });
+    const catCap = kind === 'food' ? 2 : kind === 'shop' ? 3 : 99;
+    const clCap = state.region === 'all' ? (kind === 'food' ? 3 : 2) : 99;
+
+    const picked = [];
+    // 第一輪嚴格套用多樣性上限；若數量不足，第二輪放寬只看推薦度
+    for (const relax of [false, true]) {
+      for (const it of pool) {
+        if (picked.length >= need) break;
+        if (picked.indexOf(it) >= 0) continue;
+        const cat = it.cat || 'spot';
+        const cls = it.flex || [it.cluster];
+        if (!relax) {
+          if ((catCount[cat] || 0) >= catCap) continue;
+          if (cls.every(cl => (clCount[cl] || 0) >= clCap)) continue;
+        }
+        picked.push(it);
+        bump(catCount, cat);
+        cls.forEach(cl => bump(clCount, cl));
+      }
+      if (picked.length >= need) break;
+    }
+    picked.forEach(it => state.sel.add(it.id));
+    if (picked.length) { save(); renderGrid(); renderBar(); renderTools(); }
+    return picked;
+  }
+
+  function clearAll() {
+    if (!state.sel.size) { toast('目前沒有勾選任何項目'); return; }
+    if (!confirm(`確定清除全部 ${state.sel.size} 個已勾選項目？\n（已存的行程草稿不會被刪除，隨時可以再套用回來）`)) return;
+    state.sel.clear();
+    save(); renderGrid(); renderBar(); renderTools();
+    toast('已清除全部勾選');
+  }
+
+  let toastTimer = null;
+  function toast(msg) {
+    let el = $('#toast');
+    if (!el) { el = document.createElement('div'); el.id = 'toast'; document.body.appendChild(el); }
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+  }
+
+  /* ---------- 工具列（智慧推薦／全部清除／行程草稿） ---------- */
+  function renderTools() {
+    const vs = loadVers();
+    const n = state.sel.size;
+    $('#toolrow').innerHTML =
+      `<button class="tool go" id="smartBtn">✨ 智慧推薦</button>` +
+      `<button class="tool" id="clearBtn"${n ? '' : ' disabled'}>🧹 全部清除${n ? `（${n}）` : ''}</button>` +
+      `<button class="tool ${state.draftOpen ? 'on' : ''}" id="draftBtn">📂 行程草稿（${vs.length}）</button>`;
+    $('#smartBtn').addEventListener('click', () => {
+      const picked = smartPick();
+      if (!picked.length) { toast('此篩選條件下已經沒有可再推薦的項目了'); return; }
+      const kindTxt = state.tab === 'spot' ? '景點' : state.tab === 'food' ? '美食' : '購物';
+      const scope = state.region === 'all' ? '' : `「${CLUSTERS[state.region].label}」`;
+      toast(`已依目前${scope}${kindTxt}篩選推薦勾選 ${picked.length} 項：${picked.map(p => p.name).slice(0, 3).join('、')}${picked.length > 3 ? '…' : ''}`);
+    });
+    $('#clearBtn').addEventListener('click', clearAll);
+    $('#draftBtn').addEventListener('click', () => { state.draftOpen = !state.draftOpen; renderTools(); });
+    renderDraftPanel();
+  }
+
+  function renderDraftPanel() {
+    const el = $('#draftpanel');
+    if (!state.draftOpen) { el.innerHTML = ''; el.style.display = 'none'; return; }
+    el.style.display = '';
+    const vs = loadVers();
+    const cur = selKey();
+    const rows = vs.slice().reverse().map(v => {
+      const d = new Date(v.ts);
+      const tm = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      const ids = v.ids.split('.').filter(id => DB[id]);
+      const n = { sp: 0, fo: 0, sh: 0 };
+      ids.forEach(id => { const k = DB[id].kind; if (k === 'spot') n.sp++; else if (k === 'food') n.fo++; else n.sh++; });
+      const names = ids.filter(id => DB[id].kind !== 'shop').slice(0, 4).map(id => DB[id].name).join('、');
+      return `<div class="draft ${v.ids === cur ? 'on' : ''}">
+        <div class="d-main">
+          <b>${esc(v.name)}</b> <small>${tm}</small>
+          ${v.ids === cur ? '<span class="badge ok">＝目前勾選</span>' : ''}
+          <div class="d-sum">🗼 ${n.sp}・🍜 ${n.fo}・🛍️ ${n.sh}　${esc(names)}${ids.length > 4 ? ' …' : ''}</div>
+        </div>
+        <div class="d-act">
+          <button class="mini go" data-apply="${v.id}">套用</button>
+          <button class="mini" data-mix="${v.id}">加入目前</button>
+          <button class="mini" data-ren="${v.id}">改名</button>
+          <button class="mini del" data-del="${v.id}">刪除</button>
+        </div>
+      </div>`;
+    }).join('');
+    el.innerHTML = `<div class="draft-wrap">
+      <div class="draft-head">
+        <b>📂 行程草稿</b>
+        <button class="mini" id="saveDraft">💾 將目前勾選存為草稿</button>
+        <span class="d-hint">「套用」＝用草稿取代目前勾選；「加入目前」＝把草稿併進現有勾選。草稿存在這台裝置，保留最近 10 份。</span>
+      </div>
+      ${rows || '<div class="d-empty">還沒有草稿。按「✨ 產生專屬行程」會自動存一份，也可以直接按上面的「💾 將目前勾選存為草稿」。</div>'}
+    </div>`;
   }
 
   function renderChips() {
@@ -1175,7 +1299,7 @@
     $('#result').style.display = 'none';
     $('#pick').style.display = '';
     try { history.replaceState(null, '', location.pathname); } catch (e) {}
-    renderChips(); renderGrid(); renderBar();
+    renderChips(); renderGrid(); renderBar(); renderTools();
     window.scrollTo({ top: 0 });
   }
 
@@ -1199,6 +1323,38 @@
       const b = e.target.closest('[data-sort]'); if (!b) return;
       state.sort = b.dataset.sort; renderChips(); renderGrid();
     });
+    $('#draftpanel').addEventListener('click', e => {
+      if (e.target.id === 'saveDraft') {
+        if (!state.sel.size) { toast('請先勾選一些項目再存草稿'); return; }
+        const before = loadVers().length;
+        const vs = snapshotVersion();
+        toast(vs.length > before ? `已存為「${curVersionName()}」` : `目前勾選與「${curVersionName()}」相同，未重複建立`);
+        renderTools();
+        return;
+      }
+      const btn = e.target.closest('[data-apply],[data-mix],[data-ren],[data-del]'); if (!btn) return;
+      const d = btn.dataset;
+      const id = d.apply || d.mix || d.ren || d.del;
+      let vs = loadVers();
+      const v = vs.find(x => x.id === id); if (!v) return;
+      const ids = v.ids.split('.').filter(x => DB[x]);
+      if (d.apply) {
+        state.sel = new Set(ids);
+        state.autoFill = v.af !== false;
+        save(); renderGrid(); renderBar(); renderTools();
+        toast(`已套用草稿「${v.name}」（${ids.length} 項），可以直接調整或按下方產生行程`);
+      } else if (d.mix) {
+        const before = state.sel.size;
+        ids.forEach(x => state.sel.add(x));
+        save(); renderGrid(); renderBar(); renderTools();
+        toast(`已把「${v.name}」併入目前勾選，新增 ${state.sel.size - before} 項（合計 ${state.sel.size} 項）`);
+      } else if (d.ren) {
+        const name = prompt('草稿名稱：', v.name);
+        if (name && name.trim()) { v.name = name.trim().slice(0, 20); saveVers(vs); renderTools(); }
+      } else if (d.del) {
+        if (confirm(`刪除草稿「${v.name}」？`)) { saveVers(vs.filter(x => x.id !== v.id)); renderTools(); toast('已刪除草稿'); }
+      }
+    });
     $('#grid').addEventListener('click', e => {
       if (e.target.closest('a')) return;
       const card = e.target.closest('.card'); if (!card) return;
@@ -1216,14 +1372,14 @@
     card.classList.toggle('on', on);
     card.setAttribute('aria-checked', on);
     card.querySelector('.tick').textContent = on ? '✓ 已選' : '＋ 選擇';
-    save(); renderBar();
+    save(); renderBar(); renderTools();
   }
 
   /* ---------- 啟動 ---------- */
   function init() {
     const shared = parseUrl();
     if (!shared) load();
-    renderChips(); renderGrid(); renderBar(); bindEvents();
+    renderChips(); renderGrid(); renderBar(); renderTools(); bindEvents();
     if (shared && ready()) showResult();
   }
   document.addEventListener('DOMContentLoaded', init);
