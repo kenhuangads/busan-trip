@@ -376,8 +376,11 @@
       rows.push({ k: 'hotel', t: time, pickup: day.key === 'd5' });
     }
     if (day.key === 'd5') {
-      day.squeeze = time > 740; // 12:20 前需回到飯店領行李
-      rows.push({ k: 'fixed', t: '12:30', text: '🚕 前往金海國際機場', sub: '計程車約 25 分（約NT$430-540）；13:00 前抵達辦理退稅、報到與托運' });
+      // 機場出發時間依實際回飯店時間動態推算，不早於 12:30
+      const dep = Math.max(750, ceil5(time + 10));
+      day.squeeze = dep > 750;
+      rows.push({ k: 'fixed', t: fmtT(dep), text: '🚕 前往金海國際機場',
+        sub: `計程車約 25 分（約NT$430-540）；建議 13:00 前抵達機場辦理退稅、報到與托運${day.squeeze ? `——目前行程 ${fmtT(time)} 才回到飯店，已經偏緊` : ''}` });
       rows.push({ k: 'fixed', t: '15:00', text: `✈️ ${t.inbound.dep}（${t.inbound.airline}）`, sub: '※回程起飛時間請以票面／訂位紀錄再確認' });
       rows.push({ k: 'fixed', t: '16:30', text: '🛬 抵達台中國際機場', sub: '台灣時間｜歡迎回家 🎉' });
     }
@@ -867,7 +870,7 @@
       if (!r.stores) {
         return entryHtml(fmtT(r.t), SLOT_LABELS.d5shop, `
           <div class="e-name">🛍️ 西面最後採購：Olive Young 旗艦店＋樂天百貨／樂天超市 <span class="stay">⏳ 約${durTxt(r.stay)}</span></div>
-          <div class="e-desc">美妝、伴手禮最後掃貨並辦理退稅（同店單筆滿 15,000₩ 即可退），採買完回飯店打包行李</div>
+          <div class="e-desc">美妝、伴手禮最後掃貨並辦理退稅（同店單筆滿 15,000₩ 即可退，多數專櫃可直接現場免稅價結帳；樂天百貨 1 樓有自動退稅機），採買完回飯店打包行李</div>
           ${linkRow({ g: '올리브영 부산 서면점', n: '롯데백화점 부산본점' }, '올리브영 부산 서면점')}`, 'storestop');
       }
       const inner = r.stores.map(g => `
@@ -970,7 +973,7 @@
     const groups = Object.keys(plan.shopGroups);
     if (groups.length) {
       shopHtml = `<section class="shoplist"><h2>🛍️ 採購清單（${plan.shops.length} 項）</h2>
-        <p class="hint">💡 已依「實際門市」分組並排進每日行程；退稅提醒：同店單筆滿 15,000₩ 即可退稅，Olive Young／樂天超市可現場即時退稅。</p>
+        <p class="hint">💡 已依「實際門市」分組並排進每日行程。<b>退稅：</b>門檻已降到同店單筆滿 15,000₩，樂天／新世界百貨多數專櫃出示護照可直接用「現場免稅價」結帳；拿到退稅單也不必等機場排隊——樂天百貨 1 樓有自動退稅機，刷護照與退稅單當場吐韓元現金，回飯店前順手辦完最省事。</p>
         ${groups.map(g => {
           const grp = plan.shopGroups[g];
           return `<div class="shop-group"><h3>📍 ${esc(g)}</h3>${grp.items.map(it => {
