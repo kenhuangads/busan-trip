@@ -227,6 +227,10 @@ small { color: var(--ink-3); font-weight: 400; }
 .tool.on { background: var(--ink); border-color: var(--ink); color: #fff; }
 .tool:disabled { opacity: .45; cursor: not-allowed; }
 
+/* ── v4：同品牌分店提示 ───────────── */
+.branchline { color: #1f7fc4 !important; background: #eef6fd; border-radius: 8px; padding: 3px 8px; margin-top: 4px; }
+.warnline { color: #8a6200; background: #fff7e0; border-radius: 8px; padding: 3px 8px; margin-top: 4px; font-size: 12.3px; }
+
 /* ── v4：行程草稿面板 ─────────────── */
 #draftpanel { margin-top: 12px; }
 .draft-wrap { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; border-left: 4px solid var(--ocean); }

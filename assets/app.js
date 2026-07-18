@@ -50,6 +50,16 @@
     DB[it.id] = it;
   });
 
+  /* 同品牌分店索引：讓旅客能依當天動線改選最近的一家 */
+  const BRANDS = {};
+  ALL.forEach(it => { if (it.brand) (BRANDS[it.brand] = BRANDS[it.brand] || []).push(it); });
+  const siblings = it => (it.brand && BRANDS[it.brand]) ? BRANDS[it.brand].filter(x => x.id !== it.id) : [];
+  const selectedBrands = () => {
+    const s = new Set();
+    ALL.forEach(it => { if (it.brand && state.sel.has(it.id)) s.add(it.brand); });
+    return s;
+  };
+
   const state = {
     sel: new Set(),
     tab: 'spot',            // spot | food | shop
@@ -229,6 +239,21 @@
     d1dinner: ['dinner', 'meal'], d1night: ['SPOT', 'supper', 'snack', 'dessert'],
     d5brunch: ['brunch'], d5lunch: ['lunch', 'meal']
   };
+  // 各時段的概略時間，用來比對店家營業時間（避免排到已打烊的時段）
+  const SLOT_NOMINAL = {
+    brunch: 540, morning: 615, lunch: 690, afternoon: 840, cafe: 945, sweet: 1005,
+    evening: 1050, dinner: 1065, night: 1200, latelunch: 825, pmstroll: 930, pmcafe: 1005,
+    d1dinner: 1080, d1night: 1230, d5brunch: 525, d5shop: 600, d5lunch: 680
+  };
+  // 該時段是否落在店家營業時間內（收尾預留 30 分鐘）
+  function slotOpen(item, slotKey) {
+    const t = SLOT_NOMINAL[slotKey];
+    if (t == null) return true;
+    if (item.close != null && t + 30 > item.close) return false;
+    if (item.open != null && t < item.open) return false;
+    return true;
+  }
+
   // 各時段「不早於」的開始時間（分鐘制；交通試算若更晚則以抵達為準）
   const SLOT_TARGET = {
     brunch: 540, lunch: 690, evening: 1050, dinner: 1065, night: 1200,
@@ -405,6 +430,7 @@
             if (!(sk in d.slots) || d.slots[sk]) continue;
             const acc = ACCEPT[sk] || [];
             if (!acc.includes(key)) continue;
+            if (!slotOpen(item, sk)) continue; // 該時段店家已打烊／尚未開門
             d.slots[sk] = { item, suggest: false };
             return true;
           }
@@ -435,15 +461,22 @@
     /* 自動補位建議（未勾選、清楚標示） */
     if (state.autoFill) {
       const suggested = new Set();
+      const usedBrands = selectedBrands(); // 避免補位推薦到已選品牌的另一家分店
       const suggest = (day, slotKey, filter) => {
         if (day.slots[slotKey]) return;
         const cand = FOODS.filter(f =>
           !state.sel.has(f.id) && !suggested.has(f.id) &&
+          !(f.brand && usedBrands.has(f.brand)) &&
           (f.flex || [f.cluster]).includes(day.cluster) &&
           (ACCEPT[slotKey] || []).includes(f.slot) &&
+          slotOpen(f, slotKey) &&
           (!filter || filter(f)))
           .sort((a, b) => (b.rec || 0) - (a.rec || 0) || a._idx - b._idx); // 補位取推薦度最高者
-        if (cand.length) { suggested.add(cand[0].id); day.slots[slotKey] = { item: cand[0], suggest: true }; }
+        if (cand.length) {
+          suggested.add(cand[0].id);
+          if (cand[0].brand) usedBrands.add(cand[0].brand);
+          day.slots[slotKey] = { item: cand[0], suggest: true };
+        }
       };
       const d1 = days[0], d5 = days[4];
       // Day1 逢中秋連假 → 優先 24hr 店
@@ -587,6 +620,10 @@
     const extraLine = it.kind === 'shop'
       ? `<div class="meta sub">🧭 ${distTxt}｜🛒 行程門市：${esc(it._store ? it._store.name : it.buy || '')}</div>`
       : `<div class="meta sub">🧭 ${distTxt}${it.kind === 'spot' && it.stay ? `｜⏳ 建議停留約${durTxt(it.stay)}` : ''}</div>`;
+    const sib = siblings(it);
+    const branchLine = sib.length
+      ? `<div class="meta sub branchline">🏪 同品牌另有：${sib.map(s => esc(s.area)).join('、')}——可改選離當天動線最近的一家</div>`
+      : '';
     const safeBadge = it.safe === 'warn' ? '<span class="badge warn">⚠️ 攜帶回台注意</span>'
       : it.safe === 'ok-check' ? '<span class="badge note">✅ 可帶・須託運</span>'
       : it.safe === 'ok-fragile' ? '<span class="badge note">✅ 可帶・防撞</span>'
@@ -602,7 +639,7 @@
       </div>
       <h3>${esc(it.name)}${it.kr ? ` <small>${esc(it.kr)}</small>` : ''}</h3>
       <div class="meta sub">📌 ${esc(it.area || it.buy || '')}</div>
-      ${priceLine}${waitLine}${it.area ? buyLine : ''}${extraLine}
+      ${priceLine}${waitLine}${it.area ? buyLine : ''}${extraLine}${branchLine}
       <p class="desc">${esc(it.desc)}</p>
       ${linkRow(it.links, imgQ(it))}
     </div>`;
@@ -646,6 +683,7 @@
     });
     const catCap = kind === 'food' ? 2 : kind === 'shop' ? 3 : 99;
     const clCap = state.region === 'all' ? (kind === 'food' ? 3 : 2) : 99;
+    const brands = selectedBrands(); // 同品牌分店只推薦一家
 
     const picked = [];
     // 第一輪嚴格套用多樣性上限；若數量不足，第二輪放寬只看推薦度
@@ -653,6 +691,7 @@
       for (const it of pool) {
         if (picked.length >= need) break;
         if (picked.indexOf(it) >= 0) continue;
+        if (it.brand && brands.has(it.brand)) continue; // 已有同品牌分店就跳過
         const cat = it.cat || 'spot';
         const cls = it.flex || [it.cluster];
         if (!relax) {
@@ -660,6 +699,7 @@
           if (cls.every(cl => (clCount[cl] || 0) >= clCap)) continue;
         }
         picked.push(it);
+        if (it.brand) brands.add(it.brand);
         bump(catCount, cat);
         cls.forEach(cl => bump(clCount, cl));
       }
@@ -858,6 +898,8 @@
         <span class="stay">⏳ 停留約${durTxt(r.stay)}</span></div>
       <div class="e-meta">📌 ${esc(it.area || '')} ｜ 💰 ${esc(it.price || '')}</div>
       ${it.wait ? `<div class="e-meta sub">⏱ ${esc(it.wait)}</div>` : ''}
+      ${siblings(it).length ? `<div class="e-meta sub">🏪 走不到也沒關係：${siblings(it).map(s => esc(s.area)).join('、')}也有分店</div>` : ''}
+      ${it.close != null && r.end > it.close ? `<div class="e-meta warnline">⚠️ 這家約 ${fmtT(it.close)} 打烊，此時段可能來不及——建議提前或改選同品牌其他分店</div>` : ''}
       <div class="e-desc">${esc(it.desc)}</div>${linkRow(it.links, imgQ(it))}`);
   }
 
