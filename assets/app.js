@@ -74,8 +74,9 @@
     if (links.n) a.push(`<a href="${nmap(links.n)}" target="_blank" rel="noopener">🗺️ NAVER</a>`);
     return `<div class="links" onclick="event.stopPropagation()">${a.join('')}</div>`;
   }
-  // 圖片搜尋關鍵字：優先用韓文店名／商品名，最準確
+  // 圖片搜尋關鍵字：優先用「對準清單品項」的精準韓文商品名，其次店名
   const imgQ = it => {
+    if (it.img) return it.img;
     if (it.kr) return it.kr;
     const L = it.links || {};
     if (L.s) return L.s;
