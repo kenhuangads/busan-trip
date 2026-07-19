@@ -349,6 +349,7 @@
   function optimizeDayRoute(day) {
     const seq = day.seq;
     if (!seq || seq.length < 2) return;
+    if (day.key === 'd5') return; // 返程日全在西面步行圈，維持「早餐→採購→午餐」的時段順序
     const P = st => posOfStop(st, day);
     const isFlex = st => st.type === 'store' || (st.type === 'cell' && st.cell && st.cell.anchor);
     const bandOf = st => st.type === 'd5shop' ? 0
@@ -409,32 +410,49 @@
   }
   const P2 = (st, day) => posOfStop(st, day);
 
-  /* ---- 超時保護 ----
-     一天塞太多點時，最後幾站會被推到深夜甚至隔天凌晨。
-     把「開始太晚或結束太晚」的停靠點移出時間軸，改列為同區備選。 */
-  function trimOverflow(day) {
-    const LATE_START = 1320;  // 22:00 之後才開始 → 太晚
-    const LATE_END = 1425;    // 23:45 之後才結束 → 太晚
-    for (let guard = 0; guard < 15; guard++) {
+  /* ---- 回飯店門禁 ----
+     每天都要在 21:30 前回到飯店；當天有跑到 12 公里外的遠程景點才放寬到 22:00。
+     超過就把最後面、且最不影響行程的停靠點移出來，改列同區備選。 */
+  function enforceCurfew(day) {
+    const CF = CONFIG.curfew || { normal: 1290, far: 1320, farKm: 12 };
+    const D5_BACK = 740; // 12:20 前回到飯店領行李，才趕得上 12:30 出發往機場
+
+    for (let guard = 0; guard < 20; guard++) {
       computeTimeline(day);
-      let badIdx = -1, badRow = null;
-      day.tl.forEach((r, i) => {
-        if (r.k !== 'item' && r.k !== 'store') return;
-        if (r.t >= LATE_START || r.end > LATE_END) { badIdx = i; badRow = r; }
+      let limit;
+      if (day.key === 'd5') {
+        limit = D5_BACK;
+      } else {
+        const far = day.seq.some(st => havKm(HOTEL, posOfStop(st, day)) >= CF.farKm);
+        limit = far ? CF.far : CF.normal;
+        day.curfew = limit;
+        day.farDay = far;
+      }
+      const hotelRow = day.tl.filter(r => r.k === 'hotel').pop();
+      const back = hotelRow ? hotelRow.t : null;
+      if (back == null || back <= limit || !day.seq.length) break;
+
+      // 移除優先序：散步錨點 → 自動補位 → 順路採購 → 自己勾的項目 → 最後採購（最後才動）
+      const rank = st => {
+        if (st.type === 'd5shop') return 4;
+        if (st.type === 'cell' && st.cell && st.cell.anchor) return 0;
+        if (st.type === 'cell' && st.cell && st.cell.suggest) return 1;
+        if (st.type === 'store') return 2;
+        return 3;
+      };
+      let si = -1, best = Infinity;
+      day.seq.forEach((st, i) => {
+        const r = rank(st);
+        if (r < best || (r === best && i > si)) { best = r; si = i; } // 同級取最後面那個
       });
-      if (!badRow) break;
-      // 找出對應的停靠點並移出當日序列
-      const si = day.seq.findIndex(st =>
-        (badRow.k === 'store' && st === badRow.g) ||
-        (badRow.k === 'item' && st.cell && st.cell === badRow.cell));
       if (si < 0) break;
       const [removed] = day.seq.splice(si, 1);
       if (removed.type === 'cell' && removed.cell) {
-        if (removed.cell.item && !removed.cell.suggest) {
-          removed.cell.item._trimmed = true;
-          day.backup.push(removed.cell.item);
+        if (removed.cell.item && !removed.cell.suggest) day.backup.push(removed.cell.item);
+        if (removed.slotKey) {
+          day.slots[removed.slotKey] = null;
+          if (removed.slotKey === 'd5lunch' || removed.slotKey === 'd5brunch') day.lunchDropped = true;
         }
-        if (removed.slotKey) day.slots[removed.slotKey] = null;
       }
       day.overflow = true;
     }
@@ -496,7 +514,7 @@
       transCost += tr.fare2; transMins += tr.mins; transKm += (tr.km || 0);
       modeCnt[tr.mode]++;
       time += tr.mins;
-      rows.push({ k: 'hotel', t: time, pickup: day.key === 'd5' });
+      rows.push({ k: 'hotel', t: time, pickup: day.key === 'd5', curfew: day.curfew });
     }
     if (day.key === 'd5') {
       // 機場出發時間依實際回飯店時間動態推算，不早於 12:30
@@ -679,7 +697,7 @@
     days.forEach(optimizeDayRoute);
 
     /* 時間軸試算＋超時保護（排不下的改列同區備選，不會硬排到深夜） */
-    days.forEach(trimOverflow);
+    days.forEach(enforceCurfew);
 
     /* Day5 若因「自動推薦」的午餐超過 12:20 回飯店時限 → 撤掉推薦，改建議機場輕食 */
     if (d5.squeeze) {
@@ -961,7 +979,9 @@
         <div class="e-body"><div class="free-body">🌿 自由時間約${durTxt(r.mins)}——可回飯店休息、周邊隨逛，或提早出發慢慢走</div></div></div>`;
     }
     if (r.k === 'hotel') {
-      return entryHtml(fmtT(r.t), '返回', `<div class="e-name">${r.pickup ? '🏨 回飯店領行李，整理後前往機場' : '🏨 回到樂天飯店，今日行程結束'}</div>`, 'fixed hotelend');
+      const cf = r.curfew;
+      const cfNote = (!r.pickup && cf) ? `<div class="e-meta sub">${r.t <= cf ? `✅ ${fmtT(cf)} 前到家（${cf === (CONFIG.curfew || {}).far ? '遠程日放寬標準' : '一般日標準'}）` : `⚠️ 比預定的 ${fmtT(cf)} 晚了 ${durTxt(r.t - cf)}`}</div>` : '';
+      return entryHtml(fmtT(r.t), '返回', `<div class="e-name">${r.pickup ? '🏨 回飯店領行李，整理後前往機場' : '🏨 回到樂天飯店，今日行程結束'}</div>${cfNote}`, 'fixed hotelend');
     }
     if (r.k === 'store') {
       const g = r.g;
@@ -1034,7 +1054,7 @@
       const cl = CLUSTERS[d.cluster];
       const rows = d.tl.map(r => rowHtml(r, d)).join('');
       const backup = d.backup.length ? `
-        <div class="backup"><b>⏸ 同區備選${d.overflow ? '（這天已排滿，以下排不進去——想去的話建議換掉上面某一站，或移到別天）' : '（時間排不下，可自行替換）'}</b>${d.backup.map(it => {
+        <div class="backup"><b>⏸ 同區備選${d.overflow ? `（為了在 ${fmtT(d.curfew || 1290)} 前回到飯店，以下排不進去——想去的話建議換掉上面某一站，或移到別天）` : '（時間排不下，可自行替換）'}</b>${d.backup.map(it => {
           const ci = catInfo(it);
           return `<div class="bk-item">${ci.icon} ${esc(it.name)}｜💰 ${esc(it.price || '')} ${linkRow(it.links, imgQ(it))}</div>`;
         }).join('')}</div>` : '';
@@ -1048,7 +1068,7 @@
       if (mc.metro) modeBits.push(`地鐵${mc.metro}段`);
       if (mc.walk) modeBits.push(`步行${mc.walk}段`);
       const heavy = (d.transMins || 0) >= 150;
-      const transTip = d.seq && d.seq.length ? `<div class="tip${heavy ? ' holiday' : ''}">🧭 本日交通：${modeBits.join('＋') || '皆在步行圈'}｜<b>總移動約${durTxt(d.transMins || 0)}、${(d.transKm || 0).toFixed(1)}公里</b>｜交通費預估 ${money(d.transCost || 0)}（2人合計）${heavy ? '——移動偏多，可考慮把最遠的一站換成同區其他選擇' : ''}。時間為保守估算（含候車與緩衝）。</div>` : '';
+      const transTip = d.seq && d.seq.length ? `<div class="tip${heavy ? ' holiday' : ''}">🧭 本日交通：${modeBits.join('＋') || '皆在步行圈'}｜<b>總移動約${durTxt(d.transMins || 0)}、${(d.transKm || 0).toFixed(1)}公里</b>｜交通費預估 ${money(d.transCost || 0)}（2人合計）${heavy ? '——移動偏多，可考慮把最遠的一站換成同區其他選擇' : ''}。${d.curfew ? `本日目標 ${fmtT(d.curfew)} 前回到飯店${d.farDay ? '（有遠程景點，已放寬）' : ''}。` : ''}時間為保守估算（含候車與緩衝）。</div>` : '';
       const squeezeTip = d.squeeze ? `<div class="tip holiday">⚠️ 離場前時間較緊：建議把部分採買或用餐提前，或改到機場解決。</div>` : '';
       const lunchTip = d.lunchDropped ? `<div class="tip">🍜 登機前時間有限，午餐建議外帶輕食或在機場用餐（金海機場餐飲選擇不少）。</div>` : '';
       return `
