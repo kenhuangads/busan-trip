@@ -558,7 +558,7 @@
       day.squeeze = dep > 750;
       rows.push({ k: 'fixed', t: fmtT(dep), text: '🚕 前往金海國際機場',
         sub: `計程車約 25 分（約NT$430-540）；建議 13:00 前抵達機場辦理退稅、報到與托運${day.squeeze ? `——目前行程 ${fmtT(time)} 才回到飯店，已經偏緊` : ''}` });
-      rows.push({ k: 'fixed', t: '15:00', text: `✈️ ${t.inbound.dep}（${t.inbound.airline}）`, sub: '※回程起飛時間請以票面／訂位紀錄再確認' });
+      rows.push({ k: 'fixed', t: '15:00', text: `✈️ ${t.inbound.dep}（${t.inbound.airline} ${t.inbound.flightNo}）`, sub: '✅ 已於星宇官網查詢確認班機時刻（如另有改班請以實際訂位為準）' });
       rows.push({ k: 'fixed', t: '16:30', text: '🛬 抵達台中國際機場', sub: '台灣時間｜歡迎回家 🎉' });
     }
     day.tl = rows;
