@@ -75,6 +75,9 @@ small { color: var(--ink-3); font-weight: 400; }
 .chip.stc.on { background: var(--ocean); border-color: var(--ocean); color: #fff; }
 .chip.stc.more { border-style: dashed; color: var(--ocean); background: #f2f7ff; }
 
+/* 篩選摺疊鈕：桌面隱藏（篩選列全展開）、手機顯示 */
+#filterToggle { display: none; }
+
 /* 關鍵字搜尋框 */
 #searchrow {
   display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
@@ -225,6 +228,22 @@ small { color: var(--ink-3); font-weight: 400; }
   .bar-actions { width: 100%; justify-content: space-between; margin-left: 0; }
   .entry .t { min-width: 54px; }
   .day { padding: 14px; }
+
+  /* 手機：置頂區只留「搜尋＋分頁＋篩選鈕」，篩選列收進抽屜 */
+  .tab { font-size: 13px; padding: 8px 4px; white-space: nowrap; }
+  #filterToggle {
+    display: block; width: 100%; margin-top: 8px;
+    border: 1.5px solid var(--line); background: var(--card); border-radius: 999px;
+    padding: 8px 12px; font-size: 13.5px; font-weight: 700; color: var(--ink-2); text-align: center;
+  }
+  .controls.fopen #filterToggle { background: var(--ink); border-color: var(--ink); color: #fff; }
+  #filterwrap { display: none; }
+  .controls.fopen #filterwrap { display: block; padding-top: 4px; }
+
+  /* 手機：門市列恢復單行手指滑動（觸控滑動很順，不佔畫面） */
+  #storechips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  #storechips::-webkit-scrollbar { display: none; }
+  #searchrow { padding: 7px 12px; }
 }
 
 /* ── v3：排序列 ─────────────────── */

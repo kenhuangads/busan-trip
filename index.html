@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=20260724b">
+<link rel="stylesheet" href="assets/style.css?v=20260724c">
 </head>
 <body>
 
@@ -46,11 +46,14 @@
         <button id="searchClear" class="s-clear" style="display:none" aria-label="清除搜尋">✕</button>
       </div>
       <div id="tabs"></div>
-      <div id="subchips"></div>
-      <div id="storechips"></div>
-      <div id="regionchips"></div>
-      <div id="sortrow"></div>
-      <div id="toolrow"></div>
+      <button id="filterToggle" aria-expanded="false">🎛 篩選與排序 ▼</button>
+      <div id="filterwrap">
+        <div id="subchips"></div>
+        <div id="storechips"></div>
+        <div id="regionchips"></div>
+        <div id="sortrow"></div>
+        <div id="toolrow"></div>
+      </div>
     </div>
   </div>
 
@@ -68,7 +71,7 @@
   <div class="wrap" id="result-inner"></div>
 </div>
 
-<script src="assets/data.js?v=20260724b"></script>
-<script src="assets/app.js?v=20260724b"></script>
+<script src="assets/data.js?v=20260724c"></script>
+<script src="assets/app.js?v=20260724c"></script>
 </body>
 </html>

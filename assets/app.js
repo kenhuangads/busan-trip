@@ -1090,6 +1090,22 @@
     const sorts = [['rec', '⭐ 推薦度'], ['price', '💰 價格低→高'], ['dist', '🏨 離飯店近→遠']];
     $('#sortrow').innerHTML = `<span class="sortlab">排序</span>` + sorts.map(([k, t]) =>
       `<button class="chip sort ${state.sort === k ? 'on' : ''}" data-sort="${k}">${t}</button>`).join('');
+
+    updateFilterToggle();
+  }
+
+  /* 手機篩選抽屜鈕：顯示目前生效的篩選數（桌面由 CSS 隱藏此鈕） */
+  function updateFilterToggle() {
+    const btn = $('#filterToggle'); if (!btn) return;
+    const open = $('.controls').classList.contains('fopen');
+    let n = 0;
+    if (state.tab === 'food' && state.foodCat !== 'all') n++;
+    if (state.tab === 'shop' && state.shopCat !== 'all') n++;
+    if (state.tab === 'shop' && state.store !== 'all') n++;
+    if (state.region !== 'all') n++;
+    if (state.sort !== 'rec') n++;
+    btn.textContent = `🎛 篩選與排序${n ? `・${n} 項生效` : ''} ${open ? '▲ 收合' : '▼'}`;
+    btn.setAttribute('aria-expanded', String(open));
   }
 
   function renderBar() {
@@ -1654,6 +1670,10 @@
       state.store = b.dataset.st;
       if (state.store !== 'all') { state.shopCat = 'all'; state.region = 'all'; } // 看整間店的所有推薦
       renderChips(); renderGrid();
+    });
+    $('#filterToggle').addEventListener('click', () => {
+      $('.controls').classList.toggle('fopen');
+      updateFilterToggle();
     });
     /* 關鍵字搜尋：即時過濾＋顯示各分頁命中數 */
     $('#searchBox').addEventListener('input', e => {
