@@ -66,6 +66,7 @@
     foodCat: 'all',
     shopCat: 'all',
     region: 'all',
+    store: 'all',           // 購物門市篩選（樂天百貨／新世界／NOCLAIM…）
     sort: 'rec',            // rec | price | dist
     autoFill: true,
     fromShare: false,
@@ -713,13 +714,19 @@
         else g.unplaced = true;
       });
 
+    /* 晚開門的西面選品店（NOCLAIM 12:00、ADER 13:00 等 11:00 後才開的店）
+       改排 Day 1 下午～傍晚，不塞進 Day 5 上午的最終採購（會撲空） */
+    const lateSm = smGroups.filter(g => (g.store.open || 0) >= 660);
+    const d5Sm = smGroups.filter(g => !lateSm.includes(g));
+    lateSm.forEach(g => days[0].seq.push(g));
+
     /* Day 5：西面最終採購（客製列出門市與品項） */
     const d5 = days[4];
     let d5stop;
-    if (smGroups.length) {
-      let stay = smGroups.reduce((s, g) => s + storeStay(g), 0) + 8 * (smGroups.length - 1);
+    if (d5Sm.length) {
+      let stay = d5Sm.reduce((s, g) => s + storeStay(g), 0) + 8 * (d5Sm.length - 1);
       const warn = stay > 100;
-      d5stop = { type: 'd5shop', stores: smGroups, stay: Math.min(stay, 110), warn };
+      d5stop = { type: 'd5shop', stores: d5Sm, stay: Math.min(stay, 110), warn };
     } else {
       d5stop = { type: 'd5shop', stores: null, stay: 75 };
     }
@@ -825,6 +832,7 @@
       const cl = ZONES[g.store.zone].cluster;
       let hint;
       if (g.storeId === 'cvs') hint = '隨時順手買｜' + g.store.name;
+      else if (cl === 'seomyeon' && (g.store.open || 0) >= 660) hint = 'Day 1 下午順路採買（該店中午後才開門）｜' + g.store.name;
       else if (cl === 'seomyeon') hint = 'Day 5 上午集中採買（可提前 Day 1 傍晚）｜' + g.store.name;
       else {
         const di = days.findIndex(d => d.cluster === cl && d.full);
@@ -886,7 +894,10 @@
     let list;
     if (state.tab === 'spot') list = SPOTS;
     else if (state.tab === 'food') list = state.foodCat === 'all' ? FOODS : FOODS.filter(f => f.cat === state.foodCat);
-    else list = state.shopCat === 'all' ? SHOPS : SHOPS.filter(s => s.cat === state.shopCat);
+    else {
+      list = state.shopCat === 'all' ? SHOPS : SHOPS.filter(s => s.cat === state.shopCat);
+      if (state.store !== 'all') list = list.filter(s => s.store === state.store);
+    }
     if (state.region !== 'all') list = list.filter(i => (i.flex || [i.cluster]).includes(state.region));
     list = list.slice();
     if (state.sort === 'price') list.sort((a, b) => (a.est || 0) - (b.est || 0) || a._idx - b._idx);
@@ -1039,6 +1050,19 @@
     $('#subchips').innerHTML = sub;
     $('#subchips').style.display = sub ? '' : 'none';
 
+    /* 門市篩選（僅購物分頁）：點一間門市就看該店所有推薦採購 */
+    let stc = '';
+    if (state.tab === 'shop') {
+      const cnt = {};
+      SHOPS.forEach(i => { if (i.store && STORES[i.store]) cnt[i.store] = (cnt[i.store] || 0) + 1; });
+      const keys = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]);
+      const shortName = k => STORES[k].name.replace(/（[^）]*）/g, '');
+      stc = `<span class="sortlab">門市</span><button class="chip stc ${state.store === 'all' ? 'on' : ''}" data-st="all">全部門市</button>` +
+        keys.map(k => `<button class="chip stc ${state.store === k ? 'on' : ''}" data-st="${k}" title="${esc(STORES[k].name)}">🏬 ${esc(shortName(k))}（${cnt[k]}）</button>`).join('');
+    }
+    $('#storechips').innerHTML = stc;
+    $('#storechips').style.display = stc ? '' : 'none';
+
     $('#regionchips').innerHTML = `<button class="chip rg ${state.region === 'all' ? 'on' : ''}" data-rg="all">全部區域</button>` +
       Object.entries(CLUSTERS).map(([k, v]) =>
         `<button class="chip rg ${state.region === k ? 'on' : ''}" data-rg="${k}" style="--c:${v.color}">${v.label}</button>`).join('');
@@ -1095,8 +1119,10 @@
       const g = r.g;
       const lateWarn = r.end > (g.store.close || 1440)
         ? '<div class="store-note">⚠️ 此時段可能接近打烊，請以現場營業時間為準；來不及可改列自由採買。</div>' : '';
+      const earlyWarn = g.store.open != null && r.t < g.store.open
+        ? `<div class="store-note">⚠️ 該店 ${fmtT(g.store.open)} 才開門，請留意抵達時間或往後挪。</div>` : '';
       return entryHtml(fmtT(r.t), '順路採購', `
-        <div class="e-name">🛍️ ${esc(g.store.name)} <span class="stay">⏳ 停留約${durTxt(r.stay)}</span></div>
+        <div class="e-name">🛍️ ${esc(g.store.name)} <span class="stay">⏳ 停留約${durTxt(r.stay)}</span></div>${earlyWarn}
         <div class="store-items">${g.items.map(it => `<span>☐ ${esc(it.name)}</span>`).join('')}</div>
         ${g.store.note ? `<div class="store-note">💡 ${esc(g.store.note)}</div>` : ''}${lateWarn}
         ${linkRow(g.store.links, g.store.links && g.store.links.g)}`, 'storestop');
@@ -1600,6 +1626,12 @@
     $('#regionchips').addEventListener('click', e => {
       const b = e.target.closest('[data-rg]'); if (!b) return;
       state.region = b.dataset.rg; renderChips(); renderGrid();
+    });
+    $('#storechips').addEventListener('click', e => {
+      const b = e.target.closest('[data-st]'); if (!b) return;
+      state.store = b.dataset.st;
+      if (state.store !== 'all') { state.shopCat = 'all'; state.region = 'all'; } // 看整間店的所有推薦
+      renderChips(); renderGrid();
     });
     $('#sortrow').addEventListener('click', e => {
       const b = e.target.closest('[data-sort]'); if (!b) return;

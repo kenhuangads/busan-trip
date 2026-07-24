@@ -67,8 +67,11 @@ small { color: var(--ink-3); font-weight: 400; }
   padding: 9px 8px; font-size: 14.5px; font-weight: 700; color: var(--ink-2); transition: .15s;
 }
 .tab.on { background: var(--ocean); border-color: var(--ocean); color: #fff; box-shadow: var(--shadow); }
-#subchips, #regionchips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
-#subchips::-webkit-scrollbar, #regionchips::-webkit-scrollbar { display: none; }
+#subchips, #regionchips, #storechips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+#subchips::-webkit-scrollbar, #regionchips::-webkit-scrollbar, #storechips::-webkit-scrollbar { display: none; }
+#storechips { margin-top: 6px; align-items: center; }
+#storechips .sortlab { flex: none; }
+.chip.stc.on { background: var(--ocean); border-color: var(--ocean); color: #fff; }
 #regionchips { margin-top: 6px; }
 .chip {
   white-space: nowrap; border: 1px solid var(--line); background: var(--card); color: var(--ink-2);
