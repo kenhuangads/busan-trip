@@ -67,11 +67,25 @@ small { color: var(--ink-3); font-weight: 400; }
   padding: 9px 8px; font-size: 14.5px; font-weight: 700; color: var(--ink-2); transition: .15s;
 }
 .tab.on { background: var(--ocean); border-color: var(--ocean); color: #fff; box-shadow: var(--shadow); }
-#subchips, #regionchips, #storechips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
-#subchips::-webkit-scrollbar, #regionchips::-webkit-scrollbar, #storechips::-webkit-scrollbar { display: none; }
-#storechips { margin-top: 6px; align-items: center; }
+#subchips, #regionchips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+#subchips::-webkit-scrollbar, #regionchips::-webkit-scrollbar { display: none; }
+/* 門市列：換行全顯示（預設前 8 間＋更多門市展開），不再橫向捲動 */
+#storechips { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 4px; margin-top: 6px; align-items: center; }
 #storechips .sortlab { flex: none; }
 .chip.stc.on { background: var(--ocean); border-color: var(--ocean); color: #fff; }
+.chip.stc.more { border-style: dashed; color: var(--ocean); background: #f2f7ff; }
+
+/* 關鍵字搜尋框 */
+#searchrow {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  background: var(--card); border: 1.5px solid var(--line); border-radius: 999px; padding: 8px 14px;
+}
+#searchrow:focus-within { border-color: var(--ocean); box-shadow: 0 0 0 3px rgba(31,95,191,.12); }
+#searchrow .s-ico { flex: none; font-size: 14px; }
+#searchBox { flex: 1; border: none; outline: none; background: transparent; font-family: inherit; font-size: 14.5px; color: var(--ink); min-width: 0; }
+#searchBox::placeholder { color: var(--ink-3); }
+.s-clear { flex: none; border: none; background: #eef1f6; border-radius: 999px; width: 24px; height: 24px; font-size: 12px; color: var(--ink-2); line-height: 1; }
+.s-clear:hover { background: var(--warn); color: #fff; }
 #regionchips { margin-top: 6px; }
 .chip {
   white-space: nowrap; border: 1px solid var(--line); background: var(--card); color: var(--ink-2);

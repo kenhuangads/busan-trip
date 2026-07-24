@@ -47,8 +47,13 @@
     }
     if (it.lat == null) { it.lat = HOTEL.lat; it.lng = HOTEL.lng; it.zone = 'seomyeon'; }
     it._km = havKm(HOTEL, it);
+    /* 搜尋用全文索引：名稱／韓文／區域／門市／描述／標籤／分類 */
+    const catL = it.kind === 'spot' ? '景點' : (it.kind === 'food' ? (FOOD_CATS[it.cat] || {}).label : (SHOP_CATS[it.cat] || {}).label);
+    it._hay = [it.name, it.kr, it.area, it.buy, it.desc, it.tag, it.price, catL,
+      it._store ? it._store.name : '', (META[it.id] || {}).img || ''].join(' ').toLowerCase();
     DB[it.id] = it;
   });
+  const matchQ = (it, q) => !q || q.toLowerCase().split(/\s+/).every(t => it._hay.includes(t));
 
   /* 同品牌分店索引：讓旅客能依當天動線改選最近的一家 */
   const BRANDS = {};
@@ -67,6 +72,8 @@
     shopCat: 'all',
     region: 'all',
     store: 'all',           // 購物門市篩選（樂天百貨／新世界／NOCLAIM…）
+    storeExpand: false,     // 門市列是否展開全部
+    q: '',                  // 關鍵字搜尋
     sort: 'rec',            // rec | price | dist
     autoFill: true,
     fromShare: false,
@@ -899,6 +906,7 @@
       if (state.store !== 'all') list = list.filter(s => s.store === state.store);
     }
     if (state.region !== 'all') list = list.filter(i => (i.flex || [i.cluster]).includes(state.region));
+    if (state.q) list = list.filter(i => matchQ(i, state.q));
     list = list.slice();
     if (state.sort === 'price') list.sort((a, b) => (a.est || 0) - (b.est || 0) || a._idx - b._idx);
     else if (state.sort === 'dist') list.sort((a, b) => a._km - b._km || a._idx - b._idx);
@@ -907,8 +915,11 @@
   }
 
   function renderGrid() {
+    const emptyMsg = state.q
+      ? `找不到符合「${esc(state.q)}」的項目——換個關鍵字，或看看上方其他分頁的符合筆數`
+      : '此分類目前沒有符合篩選的項目';
     $('#grid').innerHTML = filteredList().map(cardHtml).join('') ||
-      '<p class="empty">此分類目前沒有符合區域篩選的項目</p>';
+      `<p class="empty">${emptyMsg}</p>`;
   }
 
   /* ---------- 智慧推薦：依目前篩選條件挑推薦度最高、且分類與區域夠分散的項目 ---------- */
@@ -1033,7 +1044,11 @@
   }
 
   function renderChips() {
-    const tabs = [['spot', `🗼 景點（${SPOTS.length}）`], ['food', `🍜 美食（${FOODS.length}）`], ['shop', `🛍️ 購物（${SHOPS.length}）`]];
+    /* 搜尋中：各分頁顯示命中數，方便跨分頁查詢 */
+    const hit = list => list.filter(i => matchQ(i, state.q)).length;
+    const tabs = state.q
+      ? [['spot', `🗼 景點（${hit(SPOTS)} 筆符合）`], ['food', `🍜 美食（${hit(FOODS)} 筆符合）`], ['shop', `🛍️ 購物（${hit(SHOPS)} 筆符合）`]]
+      : [['spot', `🗼 景點（${SPOTS.length}）`], ['food', `🍜 美食（${FOODS.length}）`], ['shop', `🛍️ 購物（${SHOPS.length}）`]];
     $('#tabs').innerHTML = tabs.map(([k, t]) =>
       `<button class="tab ${state.tab === k ? 'on' : ''}" data-tab="${k}">${t}</button>`).join('');
 
@@ -1050,15 +1065,20 @@
     $('#subchips').innerHTML = sub;
     $('#subchips').style.display = sub ? '' : 'none';
 
-    /* 門市篩選（僅購物分頁）：點一間門市就看該店所有推薦採購 */
+    /* 門市篩選（僅購物分頁）：換行顯示，預設前 8 間＋「更多門市」展開全部 */
     let stc = '';
     if (state.tab === 'shop') {
       const cnt = {};
       SHOPS.forEach(i => { if (i.store && STORES[i.store]) cnt[i.store] = (cnt[i.store] || 0) + 1; });
       const keys = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]);
+      const TOPN = 8;
+      let shown = state.storeExpand ? keys : keys.slice(0, TOPN);
+      if (!state.storeExpand && state.store !== 'all' && !shown.includes(state.store)) shown = [...shown, state.store];
       const shortName = k => STORES[k].name.replace(/（[^）]*）/g, '');
+      const moreBtn = keys.length > TOPN
+        ? `<button class="chip stc more" data-stmore="1">${state.storeExpand ? '▲ 收合門市' : `▼ 更多門市（${keys.length - shown.length}）`}</button>` : '';
       stc = `<span class="sortlab">門市</span><button class="chip stc ${state.store === 'all' ? 'on' : ''}" data-st="all">全部門市</button>` +
-        keys.map(k => `<button class="chip stc ${state.store === k ? 'on' : ''}" data-st="${k}" title="${esc(STORES[k].name)}">🏬 ${esc(shortName(k))}（${cnt[k]}）</button>`).join('');
+        shown.map(k => `<button class="chip stc ${state.store === k ? 'on' : ''}" data-st="${k}" title="${esc(STORES[k].name)}">🏬 ${esc(shortName(k))}（${cnt[k]}）</button>`).join('') + moreBtn;
     }
     $('#storechips').innerHTML = stc;
     $('#storechips').style.display = stc ? '' : 'none';
@@ -1628,10 +1648,25 @@
       state.region = b.dataset.rg; renderChips(); renderGrid();
     });
     $('#storechips').addEventListener('click', e => {
+      const more = e.target.closest('[data-stmore]');
+      if (more) { state.storeExpand = !state.storeExpand; renderChips(); return; }
       const b = e.target.closest('[data-st]'); if (!b) return;
       state.store = b.dataset.st;
       if (state.store !== 'all') { state.shopCat = 'all'; state.region = 'all'; } // 看整間店的所有推薦
       renderChips(); renderGrid();
+    });
+    /* 關鍵字搜尋：即時過濾＋顯示各分頁命中數 */
+    $('#searchBox').addEventListener('input', e => {
+      state.q = e.target.value.trim();
+      $('#searchClear').style.display = state.q ? '' : 'none';
+      renderChips(); renderGrid();
+    });
+    $('#searchClear').addEventListener('click', () => {
+      state.q = '';
+      $('#searchBox').value = '';
+      $('#searchClear').style.display = 'none';
+      renderChips(); renderGrid();
+      $('#searchBox').focus();
     });
     $('#sortrow').addEventListener('click', e => {
       const b = e.target.closest('[data-sort]'); if (!b) return;

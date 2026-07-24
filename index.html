@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=20260724a">
+<link rel="stylesheet" href="assets/style.css?v=20260724b">
 </head>
 <body>
 
@@ -40,6 +40,11 @@
 
   <div class="controls">
     <div class="wrap">
+      <div id="searchrow">
+        <span class="s-ico">🔍</span>
+        <input id="searchBox" type="text" autocomplete="off" placeholder="搜尋店名／商品／韓文／區域…（例：烤肉、防曬、NOCLAIM）">
+        <button id="searchClear" class="s-clear" style="display:none" aria-label="清除搜尋">✕</button>
+      </div>
       <div id="tabs"></div>
       <div id="subchips"></div>
       <div id="storechips"></div>
@@ -63,7 +68,7 @@
   <div class="wrap" id="result-inner"></div>
 </div>
 
-<script src="assets/data.js?v=20260724a"></script>
-<script src="assets/app.js?v=20260724a"></script>
+<script src="assets/data.js?v=20260724b"></script>
+<script src="assets/app.js?v=20260724b"></script>
 </body>
 </html>
