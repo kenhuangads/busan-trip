@@ -36,6 +36,7 @@ const CLUSTERS = {
 const FOOD_CATS = {
   soup:    { label: '豬肉湯飯', icon: '🍲' },
   bbq:     { label: '韓式烤肉', icon: '🥩' },
+  katsu:   { label: '日式豬排', icon: '🍱' },
   crab:    { label: '醬蟹・帝王蟹', icon: '🦀' },
   porridge:{ label: '鮑魚粥・海鮮', icon: '🦪' },
   noodle:  { label: '冷麵・刀削麵', icon: '🍜' },
@@ -459,7 +460,16 @@ const FOODS = [
   { id:'f84', kind:'food', cat:'bbq', name:'肉合家 熟成豬（고하순）', kr:'고기로 하나 되는 순간 서면점', cluster:'seomyeon', area:'西面・西田路（2樓）', slot:'dinner', est:620,
     price:'熟成生五花／梅花約NT$254／份（11,800₩）、肋條肉NT$275', wait:'營業到半夜；建議22:30前入座',
     desc:'西面的熟成豬專門店，店員全程桌邊代烤不用自己顧火。熟成生五花、梅花與千層肉都是一人份計價，兩個人可以多點幾種比較。開到凌晨，是西面晚場烤肉的好選擇。',
-    tag:'專人代烤・開到半夜', links:{ g:'고기로 하나되는 순간 서면', n:'고하순 서면' } }
+    tag:'專人代烤・開到半夜', links:{ g:'고기로 하나되는 순간 서면', n:'고하순 서면' } },
+  /* 第四批口袋名單（經獨立覆核） */
+  { id:'f85', kind:'food', cat:'noodle', name:'Nasari 食堂 廣安店', kr:'나사리식당 광안점', cluster:'gwangalli', area:'廣安里海灘東段・海景第一排3樓（廣安站步行13分）', slot:'meal', est:420,
+    price:'海鮮王刀削麵約NT$323（15,000₩）；兩人加點煎餅每人約NT$410-460', wait:'不接受電話訂位，現場用 CatchTable／Tabling 取號；週末與日落前後（17:00-19:00）約等20-40分',
+    desc:'招牌해물왕칼국수用整鍋蛤蜊、淡菜、蝦與魷魚熬出清甜湯底，厚實手切刀削麵吸飽湯汁很有嚼勁；另一碗生牛肉拌麵一鹹一辣互補。真正的賣點是三樓那整面落地窗——正對廣安里海灘、右手邊就是廣安大橋，傍晚坐窗邊看夕陽轉夜景。菜單有實拍照片，不會韓文也點得動。',
+    tag:'廣安大橋窗景・平價海景', links:{ g:'나사리식당 광안점', n:'나사리식당 광안점' } },
+  { id:'f86', kind:'food', cat:'katsu', name:'豚笑 炸豬排 廣安店', kr:'톤쇼우 광안점', cluster:'gwangalli', area:'廣安里海灘東側巷內（廣安站步行16-18分）', slot:'meal', est:420, brand:'tonshou',
+    price:'伯克夏K里肌豬排約NT$387（18,000₩）；入門里肌14,500₩起，人均約NT$430', wait:'⚠️ 釜山數一數二難排：Tabling／CatchTable 每天 10:00 整開放遠端候位，假日常 30 秒額滿。務必平日前往並準時搶號，沒搶到就別排進當天行程',
+    desc:'釜山炸豬排公認的天花板、2023 藍絲帶認證。招牌伯克夏K里肌選用無農藥山地黑豬厚切，起鍋前過一道炭火煙燻——先是清脆不刮口的麵衣，裡頭是粉嫩帶肉汁的粉紅肉心，油脂香裡透著淡淡煙燻味。開放式廚房配吧台座，看得到師傅現炸現切。',
+    tag:'藍絲帶・需10點搶候位', links:{ g:'톤쇼우 광안점', n:'톤쇼우 광안점' } }
 ];
 
 /* ── 購物（60）─────────────────────────────── */
@@ -1091,6 +1101,8 @@ const META = {
   f82: { lat: 35.15657, lng: 129.05734, zone: 'seomyeon', stay: 75,  rec: 86, open: 660, close: 1250 },
   f83: { lat: 35.15590, lng: 129.05850, zone: 'seomyeon', stay: 45,  rec: 87 },
   f84: { lat: 35.15756, lng: 129.06398, zone: 'seomyeon', stay: 100, rec: 88, open: 690 },
+  f85: { lat: 35.1555,  lng: 129.1221,  zone: 'millak',   stay: 75,  rec: 89, open: 600, close: 1320 },
+  f86: { lat: 35.1564,  lng: 129.1248,  zone: 'millak',   stay: 90,  rec: 91, open: 660, close: 1320 },
   s11: { lat: 35.09875, lng: 129.00973, zone: 'gamcheon', stay: 45,  rec: 86, open: 660, close: 1050 },
   s12: { lat: 35.15430, lng: 129.12700, zone: 'millak',   stay: 120, rec: 91, open: 600 },
   p61: { store: 'ader_space',  rec: 88 },
