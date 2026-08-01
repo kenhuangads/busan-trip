@@ -282,6 +282,11 @@
     evening: 1230, dinner: 1230, d1dinner: 1260,
     night: 1320, d1night: 1320
   };
+  const DOW_TXT = ['日','一','二','三','四','五','六'];
+  // 這家店在這天有開嗎？（closedDow: 0=週日 … 6=週六）
+  const openOnDay = (o, day) =>
+    !(o && o.closedDow && day && day.dow != null && o.closedDow.indexOf(day.dow) >= 0);
+
   const isMealStop = st => st.type === 'cell' && st.cell && st.cell.item && MEAL_SLOTS.indexOf(st.slotKey) >= 0;
   function timingOk(tl) {
     return tl.every(r => {
@@ -334,15 +339,15 @@
 
   function makeDays() {
     return [
-      { key: 'd1', date: '9/26（六）', full: false, cluster: 'seomyeon', theme: '抵達釜山・西面暖身',
+      { key: 'd1', date: '9/26（六）', dow: 6, full: false, cluster: 'seomyeon', theme: '抵達釜山・西面暖身',
         slotKeys: ['latelunch', 'pmstroll', 'pmcafe', 'd1dinner', 'd1night'] },
-      { key: 'd2', date: '9/27（日）', full: true, cluster: 'east', theme: '海岸線一日',
+      { key: 'd2', date: '9/27（日）', dow: 0, full: true, cluster: 'east', theme: '海岸線一日',
         slotKeys: ['brunch', 'morning', 'lunch', 'afternoon', 'cafe', 'sweet', 'evening', 'dinner', 'night'] },
-      { key: 'd3', date: '9/28（一）', full: true, cluster: 'gwangalli', theme: '海景與夜色',
+      { key: 'd3', date: '9/28（一）', dow: 1, full: true, cluster: 'gwangalli', theme: '海景與夜色',
         slotKeys: ['brunch', 'morning', 'lunch', 'afternoon', 'cafe', 'sweet', 'evening', 'dinner', 'night'] },
-      { key: 'd4', date: '9/29（二）', full: true, cluster: 'nampo', theme: '舊城文化散策',
+      { key: 'd4', date: '9/29（二）', dow: 2, full: true, cluster: 'nampo', theme: '舊城文化散策',
         slotKeys: ['brunch', 'morning', 'lunch', 'afternoon', 'cafe', 'sweet', 'evening', 'dinner', 'night'] },
-      { key: 'd5', date: '9/30（三）', full: false, cluster: 'seomyeon', theme: '西面最終採購・返程',
+      { key: 'd5', date: '9/30（三）', dow: 3, full: false, cluster: 'seomyeon', theme: '西面最終採購・返程',
         slotKeys: ['d5brunch', 'd5shop', 'd5lunch'] }
     ];
   }
@@ -623,6 +628,7 @@
             const acc = ACCEPT[sk] || [];
             if (!acc.includes(key)) continue;
             if (!slotOpen(item, sk)) continue; // 該時段店家已打烊／尚未開門
+            if (!openOnDay(item, d)) continue;  // 這天店家公休
             d.slots[sk] = { item, suggest: false };
             return true;
           }
@@ -662,6 +668,7 @@
           (f.flex || [f.cluster]).includes(day.cluster) &&
           (ACCEPT[slotKey] || []).includes(f.slot) &&
           slotOpen(f, slotKey) &&
+          openOnDay(f, day) &&
           (!filter || filter(f)));
         // 距離感知：推薦度高但離當天其他行程太遠的店要扣分，避免為了一餐跑十幾公里
         const pts = dayPoints(day);
@@ -718,8 +725,11 @@
       .sort((a, b) => b.items.length - a.items.length)
       .forEach(g => {
         const cl = ZONES[g.store.zone].cluster;
-        const day = days.slice(1, 4).find(d => d.cluster === cl);
-        if (day) day.seq.push(g);
+        const same = days.slice(1, 4).filter(d => d.cluster === cl);
+        // 該區域日若碰上這間店公休，就找其他有開的日子（沒有就標示公休）
+        const day = same.find(d => openOnDay(g.store, d)) || same[0];
+        if (day && openOnDay(g.store, day)) day.seq.push(g);
+        else if (day) { g.closedDay = true; day.closedShops = (day.closedShops || []).concat(g); }
         else g.unplaced = true;
       });
 
@@ -768,7 +778,7 @@
             !suggested2.has(f.id) &&
             f.cluster === d.cluster &&
             (ACCEPT[slotKey] || []).indexOf(f.slot) >= 0 &&
-            slotOpen(f, slotKey))
+            slotOpen(f, slotKey) && openOnDay(f, d))
             .sort((a, b) => ((b.rec || 0) - 4 * nearestKm(pts, b)) - ((a.rec || 0) - 4 * nearestKm(pts, a)));
           if (!cand.length) return;
           // 試著插進去，確認不會害當天超過門禁
@@ -839,16 +849,23 @@
 
     /* 採購清單分組（依門市 → 對應日提示） */
     const shopGroups = {};
+    // 這個門市實際被排進哪一天？（沒排進去就別謊稱順路）
+    const placedDayOf = g => {
+      const i = days.findIndex(d => (d.seq || []).some(st => st === g) ||
+        (d.tl || []).some(r => r.k === 'store' && r.g === g) ||
+        (d.tl || []).some(r => r.k === 'd5shop' && (r.stores || []).indexOf(g) >= 0));
+      return i;
+    };
     storeGroups.forEach(g => {
       const cl = ZONES[g.store.zone].cluster;
+      const di = placedDayOf(g);
       let hint;
       if (g.storeId === 'cvs') hint = '隨時順手買｜' + g.store.name;
+      else if (g.closedDay) hint = `⚠️ 這趟排不到（該店在對應行程日公休）｜${g.store.name}`;
+      else if (di >= 0) hint = `Day ${di + 1} 順路採買｜${g.store.name}`;
       else if (cl === 'seomyeon' && (g.store.open || 0) >= 660) hint = 'Day 1 下午順路採買（該店中午後才開門）｜' + g.store.name;
       else if (cl === 'seomyeon') hint = 'Day 5 上午集中採買（可提前 Day 1 傍晚）｜' + g.store.name;
-      else {
-        const di = days.findIndex(d => d.cluster === cl && d.full);
-        hint = di >= 0 ? `Day ${di + 1} 順路採買｜${g.store.name}` : '自由安排｜' + g.store.name;
-      }
+      else hint = `⚠️ 時間排不進行程，想買要自行安排｜${g.store.name}`;
       shopGroups[hint] = { store: g.store, items: g.items };
     });
 
@@ -1244,6 +1261,7 @@
       const heavy = (d.transMins || 0) >= 150;
       const transTip = d.seq && d.seq.length ? `<div class="tip${heavy ? ' holiday' : ''}">🧭 本日交通：${modeBits.join('＋') || '皆在步行圈'}｜<b>總移動約${durTxt(d.transMins || 0)}、${(d.transKm || 0).toFixed(1)}公里</b>｜交通費預估 ${money(d.transCost || 0)}（2人合計）${heavy ? '——移動偏多，可考慮把最遠的一站換成同區其他選擇' : ''}。${d.curfew ? `本日目標 ${fmtT(d.curfew)} 前回到飯店${d.farDay ? '（有遠程景點，已放寬）' : ''}。` : ''}時間為保守估算（含候車與緩衝）。</div>` : '';
       const squeezeTip = d.squeeze ? `<div class="tip holiday">⚠️ 離場前時間較緊：建議把部分採買或用餐提前，或改到機場解決。</div>` : '';
+      const closedTip = (d.closedShops && d.closedShops.length) ? `<div class="tip holiday">🚫 ${d.closedShops.map(g => esc(g.store.name)).join('、')}<b>本日（週${DOW_TXT[d.dow]}）公休</b>，這區沒有其他天可以排——${d.closedShops.map(g => g.items.map(i => esc(i.name)).join('、')).join('；')} 需要另外找地方買，或出發前先確認營業狀況。</div>` : '';
       const mealTip = (d.noLunch || d.noDinner) ? `<div class="tip holiday">🍽️ 這天${d.noLunch && d.noDinner ? '中午與晚上都' : d.noLunch ? '中午' : '晚上'}沒有安排用餐——${d.noLunch && !d.noDinner ? '上午的行程較滿，記得在景點附近先墊個東西' : '建議從下面的同區備選挑一家，或在附近隨機找一家'}。</div>` : '';
       const lunchTip = d.lunchDropped ? `<div class="tip">🍜 登機前時間有限，午餐建議外帶輕食或在機場用餐（金海機場餐飲選擇不少）。</div>` : '';
       return `
@@ -1254,7 +1272,7 @@
         </header>
         ${dayTips[d.key] ? `<div class="tip holiday">${esc(dayTips[d.key])}</div>` : ''}
         <div class="tip">🚇 ${esc(TRANSIT[d.cluster])}</div>
-        ${transTip}${squeezeTip}${mealTip}${lunchTip}
+        ${transTip}${squeezeTip}${closedTip}${mealTip}${lunchTip}
         <div class="timeline">${rows}</div>
         ${backup}
       </section>`;
