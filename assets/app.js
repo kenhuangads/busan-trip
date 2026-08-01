@@ -430,9 +430,10 @@
         meals: timingOk(tmp.tl), back: hr ? hr.t : 0 });
     }
     if (!cand.length) return false;
+    const CLOSE_BUF = 15;                          // 打烊前留 15 分鐘結帳離場
     const ok = cand.filter(c =>
       c.meals &&                                   // 不能把任何行程擠出它該有的時段
-      (closeMin == null || c.end <= closeMin) &&
+      (closeMin == null || c.end <= closeMin - CLOSE_BUF) &&
       (openMin == null || c.start >= openMin) &&
       c.start <= 1230);
     if (!ok.length) return false;                  // 這天排不進合理時段 → 交給呼叫端列為備選
@@ -526,7 +527,8 @@
       const pos = posOfStop(stop, day);
       const tr = transCalc(cur, pos);
       const tKey = stop.slotKey || (stop.type === 'd5shop' ? 'd5shop' : null);
-      const target = tKey ? SLOT_TARGET[tKey] : null;
+      let target = tKey ? SLOT_TARGET[tKey] : null;
+      if (stop.type === 'd5shop' && stop.open) target = Math.max(target || 0, stop.open);
       const near = tr.mode === 'walk' && tr.mins <= 3; // 幾乎同地點，不畫交通列
       const arr0 = time + (near ? 3 : tr.mins);
       let start = ceil5(arr0);
@@ -733,7 +735,9 @@
     if (d5Sm.length) {
       let stay = d5Sm.reduce((s, g) => s + storeStay(g), 0) + 8 * (d5Sm.length - 1);
       const warn = stay > 100;
-      d5stop = { type: 'd5shop', stores: d5Sm, stay: Math.min(stay, 110), warn };
+      // 起始時間取「最晚開門的那間」，免得先到卻在門口等
+      const openAt = d5Sm.reduce((m, g) => Math.max(m, g.store.open || 0), 0);
+      d5stop = { type: 'd5shop', stores: d5Sm, stay: Math.min(stay, 110), warn, open: openAt || null };
     } else {
       d5stop = { type: 'd5shop', stores: null, stay: 75 };
     }

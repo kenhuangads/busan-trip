@@ -945,9 +945,9 @@ const ZONES = {
 
 /* 具體採購門市（購物項目 → 門市 → 排入每日行程） */
 const STORES = {
-  oy_seomyeon:     { name: 'Olive Young 西面旗艦店', zone: 'seomyeon', lat: 35.1575, lng: 129.0578, stay: 60, close: 1350,
+  oy_seomyeon:     { name: 'Olive Young 西面旗艦店', zone: 'seomyeon', lat: 35.1575, lng: 129.0578, stay: 60, open: 600, close: 1350,
     note: '單筆滿 15,000₩ 即可退稅，出示護照現場即時折抵，記得帶護照（10:00 開門）', links: { g: '올리브영 부산 서면점', n: '올리브영 부산 서면점' } },
-  lottedept:       { name: '樂天百貨 釜山本店', zone: 'seomyeon', lat: 35.1552, lng: 129.0596, stay: 75, close: 1200,
+  lottedept:       { name: '樂天百貨 釜山本店', zone: 'seomyeon', lat: 35.1552, lng: 129.0596, stay: 75, open: 630, close: 1200,
     note: '與樂天飯店同棟連通，逛完直接回房（10:30 開門）。出示護照多數專櫃可直接以「現場免稅價」結帳；1 樓另設自動退稅機，刷護照＋退稅單當場吐韓元現金。B1 有質感美食街可補體力', links: { g: '롯데백화점 부산본점', n: '롯데백화점 부산본점' } },
   musinsa:         { name: 'MUSINSA STANDARD 西面旗艦店', zone: 'seomyeon', lat: 35.1568, lng: 129.0645, stay: 45, close: 1290,
     links: { g: '무신사 스탠다드 서면', n: '무신사 스탠다드 서면' } },
@@ -955,7 +955,7 @@ const STORES = {
     links: { g: '서면 지하상가', n: '서면 지하상가' } },
   cvs:             { name: '飯店周邊超商（GS25／CU）', zone: 'seomyeon', lat: 35.1575, lng: 129.0560, stay: 10, close: 1440,
     note: '香蕉牛奶當地喝最讚（液體不可手提上機）', links: { g: 'GS25 서면' } },
-  shinsegae:       { name: '新世界百貨 Centum City', zone: 'centum', lat: 35.1691, lng: 129.1306, stay: 90, close: 1200,
+  shinsegae:       { name: '新世界百貨 Centum City', zone: 'centum', lat: 35.1691, lng: 129.1306, stay: 90, open: 630, close: 1200,
     note: '金氏認證全球最大百貨，與 Spa Land 同棟（10:30 開門）。潮牌集中在 B2 Hyper Ground，週末人潮可觀——想買的重點品牌（Emis、Salomon）建議一進場就先攻，熱門色與尺碼下午常被掃空', links: { g: '신세계백화점 센텀시티', n: '신세계백화점 센텀시티' } },
   lottemart:       { name: '樂天超市 光復店', zone: 'nampo', lat: 35.0979, lng: 129.0364, stay: 60, close: 1320,
     note: '南浦站直結、可退稅；零食泡麵泡菜一次掃齊', links: { g: '롯데마트 광복점', n: '롯데마트 광복점' } },
@@ -985,7 +985,7 @@ const STORES = {
     note: '平日營業到 23:00、週末到凌晨 01:00——夜貓行程的救星，逛完宵夜再回飯店剛剛好', links: { g: '피플 부산점', n: '피플 부산점' } },
   avivere:         { name: 'AVIVERE Company 生活選物（田浦）', zone: 'jeonpo', lat: 35.1528, lng: 129.0662, stay: 40, open: 660, close: 1380,
     note: '11:00-23:00；復古×媚俗美學的生活風格選品，消費滿 70,000₩ 可免費宅配（可寄飯店）', links: { g: '아비베레 컴퍼니', n: '아비베레 컴퍼니' } },
-  lotte_outlet:    { name: '東釜山樂天 Premium Outlets（機張 OSIRIA）', zone: 'osiria', lat: 35.1893, lng: 129.2122, stay: 120, close: 1260,
+  lotte_outlet:    { name: '東釜山樂天 Premium Outlets（機張 OSIRIA）', zone: 'osiria', lat: 35.1893, lng: 129.2122, stay: 120, open: 630, close: 1260,
     note: '聖托里尼純白建築，與海東龍宮寺／Skyline Luge 同在機張 OSIRIA 一帶順遊最省時；運動品牌常態過季 3 折起／買二送一', links: { g: '롯데프리미엄아울렛 동부산점', n: '롯데프리미엄아울렛 동부산' } },
   strut:           { name: 'STRUT Coffee（田浦）', zone: 'jeonpo', lat: 35.1548, lng: 129.0648, stay: 20, close: 1320,
     note: '文青自家烘焙咖啡店，咖啡豆是把釜山咖啡館氛圍帶回家的伴手禮', links: { g: '스트럿커피 전포', n: '스트럿 커피' } },
