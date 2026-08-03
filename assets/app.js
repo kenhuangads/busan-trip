@@ -1294,7 +1294,7 @@
     const groups = Object.keys(plan.shopGroups);
     if (groups.length) {
       shopHtml = `<section class="shoplist"><h2>🛍️ 採購清單（${plan.shops.length} 項）</h2>
-        <p class="hint">💡 已依「實際門市」分組並排進每日行程。<b>退稅：</b>門檻已降到同店單筆滿 15,000₩，樂天／新世界百貨多數專櫃出示護照可直接用「現場免稅價」結帳；拿到退稅單也不必等機場排隊——樂天百貨 1 樓有自動退稅機，刷護照與退稅單當場吐韓元現金，回飯店前順手辦完最省事。</p>
+        <p class="hint">💡 已依「實際門市」分組並排進每日行程。<b>退稅：</b>門檻已降到同店單筆滿 15,000₩，樂天／新世界百貨多數專櫃出示護照可直接用「現場免稅價」結帳（大同、READY YOUNG 等事後免稅藥局也支援）；拿到退稅單也不必等機場排隊——樂天百貨 1 樓有自動退稅機，刷護照與退稅單當場吐韓元現金。注意：現場即時退稅單筆限 100 萬₩、全程累計 500 萬₩；單筆退稅額超過 7.5 萬₩（約單筆消費 100 萬₩，例如精品包）須帶未拆封商品先到機場海關查驗蓋章、之後才能託運。</p>
         ${groups.map(g => {
           const grp = plan.shopGroups[g];
           return `<div class="shop-group"><h3>📍 ${esc(g)}</h3>${grp.items.map(it => {
@@ -1304,7 +1304,7 @@
             return `<div class="shop-item"><div><b>${ci.icon} ${esc(it.name)}</b> ${safeTxt}<div class="e-meta sub">🏬 ${esc(it.buy)}｜💰 ${esc(it.price)}</div></div>${linkRow(it.links, imgQ(it))}</div>`;
           }).join('')}</div>`;
         }).join('')}
-        <div class="tip customs">🛃 <b>台灣海關提醒：</b>所有肉類製品（肉乾、火腿腸、含肉塊泡麵）嚴禁入境，首次查獲罰 NT$20 萬；泡菜、芝麻油、果醬等液體/發酵品必須託運；純海鮮加工品（魚糕、海苔）可安心帶。不確定就走紅線主動申報，申報不罰。</div>
+        <div class="tip customs">🛃 <b>台灣海關提醒：</b>所有肉類製品（肉乾、火腿腸、含肉塊泡麵）嚴禁入境，首次查獲罰 NT$20 萬；泡菜、芝麻油、果醬等液體/發酵品必須託運；純海鮮加工品（魚糕、海苔）可安心帶。<b>藥局藥妝：</b>痘痘藥、去疤膏、貼布等西藥「每種最多 12 件、合計 36 件」（錠狀保健品同 12/36），僅限自用——任何形式轉售或代購都違反藥事法（最高罰 NT$200 萬）。不確定就走紅線主動申報，申報不罰。</div>
       </section>`;
     }
 

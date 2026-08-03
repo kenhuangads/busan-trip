@@ -50,6 +50,7 @@ const FOOD_CATS = {
 const SHOP_CATS = {
   souvenir:{ label: '伴手禮', icon: '🎁' },
   beauty:  { label: '美妝保養', icon: '💄' },
+  pharmacy:{ label: '藥局藥妝', icon: '💊' },
   daily:   { label: '生活用品', icon: '🧴' },
   men:     { label: '男性服飾配件', icon: '👔' },
   women:   { label: '女性服飾包款', icon: '👜' },
@@ -480,8 +481,8 @@ const FOODS = [
 const SHOPS = [
   /* 伴手禮 */
   { id:'p01', kind:'shop', cat:'souvenir', name:'Busan Bada Sand 海鹽奶油沙餅', buy:'海雲台本店／釜山站', cluster:'east', est:375,
-    price:'約NT$375／9入（17,500₩）', safe:'ok',
-    desc:'海雲台海鹽×法國奶油、焦糖蜂蜜流心，包裝精品感十足，送禮首選。',
+    price:'約NT$375-420／9入（17,500-19,500₩）', safe:'ok',
+    desc:'海雲台海鹽×法國奶油、焦糖蜂蜜流心，高質感北極熊插畫禮盒爆紅中，送禮首選（奶油內餡怕熱，買完別久放車內／背包直曬）。',
     links:{ g:'부산바다샌드 해운대', s:'부산 바다샌드' } },
   { id:'p02', kind:'shop', cat:'souvenir', name:'釜山星光夾心餅乾', buy:'KTX釜山站2樓', cluster:'nampo', est:215,
     price:'約NT$215／5入（9,900₩）', safe:'ok',
@@ -893,7 +894,52 @@ const SHOPS = [
   { id:'p102', kind:'shop', cat:'souvenir', name:'三進魚板 Samjin Amook 禮盒', buy:'新世界百貨 Centum City／影島本店', cluster:'east', est:320,
     price:'綜合魚板約NT$215-430（10,000-20,000₩）', safe:'ok-check',
     desc:'釜山歷史最悠久的魚糕老店（1953 年影島起家），包整隻鮮蝦或濃郁起司的品項必夾；店內先吃現做熱食，再買真空包裝＋保冷袋帶回台灣（須託運冷藏）。',
-    links:{ o:'https://www.samjinfood.com/', s:'삼진어묵 선물세트', g:'삼진어묵 신세계 센텀시티' } }
+    links:{ o:'https://www.samjinfood.com/', s:'삼진어묵 선물세트', g:'삼진어묵 신세계 센텀시티' } },
+  /* 第五批：藥局藥妝（2025-2026 釜山藥局消費趨勢報告；PDRN 與指示用藥為藥局限定通路） */
+  { id:'p103', kind:'shop', cat:'pharmacy', name:'Dr. Reju-All PDRN 再生霜＋護唇精華', buy:'大同藥局／READY YOUNG 等南浦藥局', cluster:'nampo', est:970,
+    price:'再生霜約NT$970（45,000₩）；護唇精華約NT$345（16,000₩）', safe:'ok',
+    desc:'社群封「塗抹式水光針／平替版麗珠蘭」的藥局銷售霸主：1200ppm 高濃度 PDRN＋2% 菸鹼醯胺＋1% 泛醇，水乳質地清爽好吸收，醫美術後穩定與換季修護首選；藥師小技巧：混一點日常乳液提升延展性。護唇精華是熱門伴手小物。',
+    links:{ s:'리쥬올 PDRN 재생크림', g:'대동약국 남포동' } },
+  { id:'p104', kind:'shop', cat:'pharmacy', name:'Rejuvelane PDRN 再生修復霜', buy:'SANA藥局（西面）等醫美藥局', cluster:'seomyeon', est:1000,
+    price:'約NT$1,000／16g（約46,000₩）', safe:'ok',
+    desc:'專業級皮膚急救霜：主打提升彈性、撫平深層細紋，熟齡肌與雷射術後修護的口碑款。',
+    links:{ s:'Rejuvelane PDRN 크림', g:'사나약국 서면' } },
+  { id:'p105', kind:'shop', cat:'pharmacy', name:'Re4day 全效 PDRN 消腫緊緻膠原飲', buy:'SANA藥局（西面）等醫美藥局', cluster:'seomyeon', est:860,
+    price:'約NT$650-1,080／盒（30,000-50,000₩，估）', safe:'ok-check',
+    desc:'2026 爆紅的「口服麗珠蘭」：PDRN＋低分子膠原＋神經醯胺＋積雪草，液態吸收率逾 90%，醫美療程後加速消腫、由內澎潤（液體須託運）。',
+    links:{ s:'Re4day PDRN 콜라겐 드링크', g:'사나약국 서면' } },
+  { id:'p106', kind:'shop', cat:'pharmacy', name:'Aclean Gel 去粉刺凝膠（東亞製藥）', buy:'大同藥局／READY YOUNG 等藥局', cluster:'nampo', est:350,
+    price:'約NT$350（約16,000₩）', safe:'warn',
+    desc:'抗痘三部曲①前期調理：2% 水楊酸＋茶樹精油溫和溶解毛孔油脂，從源頭阻斷白頭黑頭惡化成發炎痘，T 字與下巴局部薄擦。※西藥每種限 12 件、合計 36 件，僅限自用。',
+    links:{ s:'애클린겔', g:'대동약국 남포동' } },
+  { id:'p107', kind:'shop', cat:'pharmacy', name:'Acnon Cream 痘痘藥膏（東亞製藥）', buy:'大同藥局／READY YOUNG 等藥局', cluster:'nampo', est:200,
+    price:'約NT$200／13g（約9,000₩）', safe:'warn',
+    desc:'抗痘三部曲②發炎期：Ibuprofen Piconol 抗發炎＋IPMP 抗菌，紅腫膿包痘快速鎮靜，韓國女生化妝包常備神器。※限自用、12/36 件內。',
+    links:{ s:'애크논크림', g:'대동약국 남포동' } },
+  { id:'p108', kind:'shop', cat:'pharmacy', name:'Noscarna Gel 去疤修復膏（東亞製藥）', buy:'大同藥局／READY YOUNG 等藥局', cluster:'nampo', est:350,
+    price:'約NT$320-380／20g（15,000-18,000₩）', safe:'warn',
+    desc:'抗痘三部曲③收尾：蟬聯多年韓國痘疤藥銷售冠軍，肝素鈉＋尿囊素＋B3＋E 軟化疤痕、淡化痘印與色素，成膜透明不影響上妝。※限自用、12/36 件內。',
+    links:{ s:'노스카나겔', g:'대동약국 남포동' } },
+  { id:'p109', kind:'shop', cat:'pharmacy', name:'Mela Toning 褪黑素祛斑霜（東亞製藥）', buy:'大同藥局／READY YOUNG 等藥局', cluster:'nampo', est:580,
+    price:'約NT$580（約27,000₩）', safe:'warn',
+    desc:'傳明酸＋熊果素＋維他命 C 抑制酪胺酸酶，對付黃褐斑、雀斑與頑固痘印。⚠️ 成分感光：只能夜間睡前局部點塗，白天未嚴格防曬極易「反黑」。※限自用。',
+    links:{ s:'멜라토닝크림', g:'대동약국 남포동' } },
+  { id:'p110', kind:'shop', cat:'pharmacy', name:'Hanmi PRO-CALM Red X 瘀青黑眼圈霜', buy:'SANA藥局（西面）等醫美藥局', cluster:'seomyeon', est:430,
+    price:'依現場定價，約NT$320-540（估）', safe:'ok',
+    desc:'維他命 K＋山金車花促進微血管循環，醫美打針／填充／抽血後的瘀青消退神器，血管型黑眼圈也適用。',
+    links:{ s:'한미 레드엑스크림', g:'사나약국 서면' } },
+  { id:'p111', kind:'shop', cat:'pharmacy', name:'CellMed CYAPLEX BALM 多功能再生霜', buy:'SANA藥局（西面）等醫美藥局', cluster:'seomyeon', est:500,
+    price:'約NT$500（約23,000₩）', safe:'ok',
+    desc:'韓國皮膚科醫師推薦的 100% 天然再生霜：乳木果油＋荷荷巴油深層補水成膜，雷射後、極乾肌、嘴角與指緣乾裂的局部急救。',
+    links:{ s:'셀메드 CYAPLEX 밤', g:'사나약국 서면' } },
+  { id:'p112', kind:'shop', cat:'pharmacy', name:'HEB 解酒貼片／Inno.N 解酒果凍', buy:'READY YOUNG 藥局（南浦・營業到23:00）', cluster:'nampo', est:270,
+    price:'約NT$215-320／包（10,000-15,000₩，估）', safe:'warn',
+    desc:'烤肉配燒酒行程的保命符：飲酒前貼手腕，薑黃素＋牛磺酸＋水飛薊素透皮吸收、減緩宿醉，年輕旅客詢問度最高的新爆品。※保健品同樣限 12/36 件。',
+    links:{ s:'숙취해소 패치 HEB', g:'레디영약국 부산' } },
+  { id:'p113', kind:'shop', cat:'pharmacy', name:'Sinil Pharm 24 小時痠痛貼布', buy:'READY YOUNG／大同等各大藥局', cluster:'nampo', est:245,
+    price:'約NT$170-320（8,000-15,000₩，估）', safe:'warn',
+    desc:'高強度暴走行程的救星：溫感舒緩／涼感鎮靜兩款、藥效長達 24 小時，爬完甘川洞回飯店貼一片。※貼布屬西藥，每種限 12 件、合計 36 件，僅限自用。',
+    links:{ s:'신일제약 파스', g:'레디영약국 부산' } }
 ];
 
 /* ── 免費填充活動（每區）─────────────────── */
@@ -1007,6 +1053,12 @@ const STORES = {
     note: '2025年10月開幕的三層樓鞋類旗艦，Salomon／Asics／adidas 復古款一次看齊', links: { g: 'ABC마트 그랜드스테이지 부산서면본점', n: 'ABC마트 그랜드스테이지 서면' } },
   mirukku:         { name: '미루꾸커피 廣安店', zone: 'millak', lat: 35.1555, lng: 129.1255, stay: 15, open: 630, close: 1320,
     note: '⚠️ 不在南浦——品牌在釜山只有廣安分店（민락로 17），請與廣安里行程一起排', links: { g: '미루꾸커피 부산광안점', n: '미루꾸커피 광안' } },
+  daedong:         { name: '大同藥局（南浦洞・BIFF廣場旁）', zone: 'nampo', lat: 35.0983, lng: 129.0265, stay: 30, open: 480, close: 1290,
+    note: '1957 年創立的藥局採購殿堂：中文諮詢、全年無休（08:00-21:30）、可退稅，Dr. Reju-All 等 PDRN 藥妝價格極具競爭力。想批發尋寶可加逛光復路老字號「韓一社藥局」（僅韓文、品項超多）', links: { g: '대동약국 남포동', n: '대동약국 부산' } },
+  readyyoung:      { name: 'READY YOUNG 藥局 釜山店（南浦洞）', zone: 'nampo', lat: 35.0975, lng: 129.0282, stay: 30, open: 600, close: 1380,
+    note: '2026 春季新開幕的精品化藥局：藍色門面＋白虎海鷗吉祥物、陳列明亮如選品店，中英服務、支援各家信用卡與退稅，營業到 23:00——逛完 BIFF 夜市再來補貨也來得及', links: { g: '레디영약국 부산', n: '레디영약국' } },
+  sana:            { name: 'SANA藥局（西面・醫美術後專門）', zone: 'seomyeon', lat: 35.1560, lng: 129.0585, stay: 30, open: 540, close: 1200,
+    note: '西面醫美聚落旁的專業藥局，專進 Olive Young 買不到的術後修護與再生級藥妝（營業時間以門市公告為準）。西面地下街「安心藥局」、伽倻大路「釜田愛藥局」也有事後免稅資格可退稅', links: { g: '사나약국 서면', n: '사나약국 부산' } },
 };
 
 /* 各項目補充：座標／生活圈／建議停留分鐘（含排隊與緩衝的保守值）；購物項目 → 門市 */
@@ -1172,7 +1224,19 @@ const META = {
   p99: { store: 'lottemart',    rec: 85, img: '신라면 블랙' },
   p100:{ store: 'oy_seomyeon',  rec: 80, img: '딜라잇프로젝트 프로틴 쿠키' },
   p101:{ store: 'strut',        rec: 76, img: '스트럿 커피 원두' },
-  p102:{ store: 'shinsegae',    rec: 87, img: '삼진어묵 선물세트' }
+  p102:{ store: 'shinsegae',    rec: 87, img: '삼진어묵 선물세트' },
+  /* 第五批：藥局藥妝 */
+  p103:{ store: 'daedong',      rec: 93, img: '리쥬올 PDRN 재생크림' },
+  p104:{ store: 'sana',         rec: 82, img: 'Rejuvelane PDRN 크림' },
+  p105:{ store: 'sana',         rec: 83, img: 'Re4day PDRN 콜라겐 드링크' },
+  p106:{ store: 'daedong',      rec: 82, img: '애클린겔' },
+  p107:{ store: 'daedong',      rec: 88, img: '애크논크림' },
+  p108:{ store: 'daedong',      rec: 91, img: '노스카나겔' },
+  p109:{ store: 'daedong',      rec: 80, img: '멜라토닝크림' },
+  p110:{ store: 'sana',         rec: 79, img: '한미 레드엑스크림' },
+  p111:{ store: 'sana',         rec: 81, img: '셀메드 CYAPLEX 밤' },
+  p112:{ store: 'readyyoung',   rec: 85, img: '숙취해소 패치 HEB' },
+  p113:{ store: 'readyyoung',   rec: 86, img: '신일제약 파스 24시간' }
 };
 
 /* 免費散步錨點的座標與停留 */
