@@ -405,9 +405,11 @@
     const CFc = CONFIG.curfew || { normal: 1290, far: 1320, farKm: 12 };
     day.curfewLimit = seq.some(st => havKm(HOTEL, posOfStop(st, day)) >= CFc.farKm) ? CFc.far : CFc.normal;
 
-    // 只有正餐綁定時段先後（早餐→午餐→晚餐），其餘全部可依地理位置彈性安插
-    const meals = seq.filter(isMealStop).sort((a, b) => bandOf(a) - bandOf(b));
-    const rest = seq.filter(st => !isMealStop(st));
+    // 正餐與「手動指定」的項目固定在時段順序上，其餘才依地理位置彈性安插
+    // （手動指定若也走彈性插入，算出的時間超過該時段上限就會被丟回備選＝推翻使用者的決定）
+    const isFixed = st => isMealStop(st) || (st.type === 'cell' && st.cell && st.cell.pinned);
+    const meals = seq.filter(isFixed).sort((a, b) => bandOf(a) - bandOf(b));
+    const rest = seq.filter(st => !isFixed(st));
     day.seq = meals;
 
     // 先插停留較久的（景點通常最長，先卡位才不會被擠掉），再插採購與散步
