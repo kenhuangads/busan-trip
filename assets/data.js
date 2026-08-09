@@ -8,7 +8,7 @@
 const CONFIG = {
   baseUrl: 'https://kenhuangads.github.io/busan-trip/',
   rateNote: '價格換算基準：1,000韓元 ≈ NT$21.5（2026年7月匯率）。所有金額為 2026 年估算平均範圍，實際以現場為準。',
-  minSpots: 4,
+  minSpots: 3,
   minFoods: 6,
   /* 回飯店門禁：平常 21:30 前到家；當天有跑到 12 公里外的遠程景點才放寬到 22:00 */
   curfew: { normal: 1290, far: 1320, farKm: 12 },
