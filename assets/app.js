@@ -77,7 +77,8 @@
     sort: 'rec',            // rec | price | dist
     autoFill: true,
     fromShare: false,
-    draftOpen: false
+    draftOpen: false,
+    pins: {}                // 手動調整：{ 項目id: { d:第幾天(0-4), s:時段key或null } }
   };
 
   const gimg = q => 'https://www.google.com/search?udm=2&q=' + encodeURIComponent(q); // Google 圖片搜尋
@@ -117,6 +118,7 @@
     try {
       localStorage.setItem('busan_sel_v2', JSON.stringify([...state.sel]));
       localStorage.setItem('busan_af_v2', state.autoFill ? '1' : '0');
+      localStorage.setItem('busan_pins_v1', JSON.stringify(state.pins));
     } catch (e) {}
   }
   function load() {
@@ -124,11 +126,16 @@
       const s = JSON.parse(localStorage.getItem('busan_sel_v2') || '[]');
       s.forEach(id => { if (DB[id]) state.sel.add(id); });
       state.autoFill = localStorage.getItem('busan_af_v2') !== '0';
+      try { state.pins = JSON.parse(localStorage.getItem('busan_pins_v1') || '{}') || {}; } catch (e) { state.pins = {}; }
     } catch (e) {}
   }
+  const encPins = () => Object.entries(state.pins)
+    .filter(([id]) => state.sel.has(id))
+    .map(([id, v]) => id + '-' + v.d + (v.s ? '-' + v.s : '')).join('.');
   function shareUrl() {
     const ids = [...state.sel].sort();
-    return CONFIG.baseUrl + '?s=' + ids.join('.') + (state.autoFill ? '' : '&af=0');
+    const p = encPins();
+    return CONFIG.baseUrl + '?s=' + ids.join('.') + (state.autoFill ? '' : '&af=0') + (p ? '&p=' + p : '');
   }
   function parseUrl() {
     const p = new URLSearchParams(location.search);
@@ -138,6 +145,12 @@
     if (!ids.length) return false;
     state.sel = new Set(ids);
     state.autoFill = p.get('af') !== '0';
+    const pin = p.get('p');
+    state.pins = {};
+    if (pin) pin.split('.').forEach((t, i) => {
+      const a = t.split('-');
+      if (a[0] && DB[a[0]] && a[1] != null) state.pins[a[0]] = { d: +a[1], s: a[2] || null, t: i };
+    });
     state.fromShare = true;
     return true;
   }
@@ -419,19 +432,27 @@
     const store = stop.type === 'store' ? stop.store : null;
     const openMin = store && store.open != null ? store.open : null;
     const closeMin = store && store.close != null ? store.close : null;
-    const cand = [];
+    // 先用幾何繞路快速排序（便宜），只對最順的幾個位置做完整時間軸試算（昂貴）
+    // 否則每插一個點都要跑 n 次時間軸，項目一多會變成 O(n³)
+    const geo = [];
     for (let i = -1; i < seq.length; i++) {
+      const A = i < 0 ? HOTEL : P2(seq[i], day);
+      const B = i + 1 >= seq.length ? HOTEL : P2(seq[i + 1], day);
+      geo.push({ i, det: havKm(A, S) + havKm(S, B) - havKm(A, B) });
+    }
+    geo.sort((a, b) => a.det - b.det);
+    const TRY_TOP = 8;
+    const cand = [];
+    for (const g of geo.slice(0, TRY_TOP)) {
       const seq2 = seq.slice();
-      seq2.splice(i + 1, 0, stop);
+      seq2.splice(g.i + 1, 0, stop);
       const tmp = { key: day.key, cluster: day.cluster, seq: seq2 };
       computeTimeline(tmp);
       const row = tmp.tl.find(r => (r.k === 'store' && r.g === stop) ||
         (r.k === 'item' && stop.cell && r.cell === stop.cell));
       if (!row) continue;
-      const A = i < 0 ? HOTEL : P2(seq[i], day);
-      const B = i + 1 >= seq.length ? HOTEL : P2(seq[i + 1], day);
       const hr = tmp.tl.filter(x => x.k === 'hotel').pop();
-      cand.push({ i, det: havKm(A, S) + havKm(S, B) - havKm(A, B), start: row.t, end: row.end,
+      cand.push({ i: g.i, det: g.det, start: row.t, end: row.end,
         meals: timingOk(tmp.tl), back: hr ? hr.t : 0 });
     }
     if (!cand.length) return false;
@@ -476,6 +497,7 @@
 
       // 移除優先序：散步錨點 → 自動補位 → 順路採購 → 自己勾的項目 → 最後採購（最後才動）
       const rank = st => {
+        if (st.type === 'cell' && st.cell && st.cell.pinned) return 6; // 手動指定的最後才動
         if (st.type === 'd5shop') return 5;
         if (isMealStop(st)) return 4;   // 正餐（含自動補位的）最後才動
         if (st.type === 'cell' && st.cell && st.cell.anchor) return 0;
@@ -637,15 +659,50 @@
       return false;
     }
 
+    /* 手動調整優先：使用者指定的日期／時段先卡位，其餘再自動排在它周圍 */
+    const pinnedIds = new Set();
+    // 最近一次指定的優先卡位（兩項指定同一時段時，後操作的贏）
+    [...spots, ...foods]
+      .filter(it => state.pins[it.id])
+      .sort((a, b) => (state.pins[b.id].t || 0) - (state.pins[a.id].t || 0))
+      .forEach(it => {
+        const pin = state.pins[it.id];
+        const d = days[pin.d];
+        if (!d) return;
+        const key = it.kind === 'spot' ? 'SPOT' : it.slot;
+        const pref = it.kind === 'spot' ? (SPOT_PREF[it.slot] || SPOT_PREF.afternoon)
+                                        : (FOOD_PREF[it.slot] || FOOD_PREF.meal);
+        // 指定時段最優先；被佔走時退回該型態的偏好順序，再不行就用當天任何空時段
+        const put = sk => {
+          if (!(sk in d.slots) || d.slots[sk] || sk === 'd5shop') return false;
+          d.slots[sk] = { item: it, suggest: false, pinned: true };
+          pinnedIds.add(it.id);
+          if (!openOnDay(it, d)) d.pinnedClosed = (d.pinnedClosed || []).concat(it);
+          return true;
+        };
+        // 放寬時的順位：先找性質接近的時段（餐廳優先正餐、景點優先白天），且店家要有開
+        const RELAX = it.kind === 'spot'
+          ? ['morning', 'afternoon', 'pmstroll', 'evening', 'night', 'd1night', 'cafe', 'sweet']
+          : ['lunch', 'dinner', 'latelunch', 'd1dinner', 'd5lunch', 'sweet', 'pmcafe', 'cafe',
+             'night', 'd1night', 'brunch', 'd5brunch'];
+        // 第一輪：指定時段（使用者說了算）→ 第二輪：型態偏好 → 第三輪：性質相近的空時段
+        // 使用者已經指定了這天，寧可換個時段也不要讓它掉出行程
+        const ok = (pin.s && put(pin.s)) ||
+          pref.some(sk => (ACCEPT[sk] || []).includes(key) && slotOpen(it, sk) && put(sk)) ||
+          RELAX.some(sk => d.slotKeys.indexOf(sk) >= 0 && slotOpen(it, sk) && put(sk));
+        if (!ok) return;
+      });
+
     const unplaced = [];
     // 先放景點（slot 較稀缺）
     spots.forEach(it => {
+      if (pinnedIds.has(it.id)) return;
       const clusters = it.flex || [it.cluster];
       if (!tryPlace(it, SPOT_PREF[it.slot] || SPOT_PREF.afternoon, clusters)) unplaced.push(it);
     });
     // 再放餐飲：固定區域者先、彈性（多分店）者後
-    const fixedFoods = foods.filter(f => !f.flex);
-    const flexFoods = foods.filter(f => f.flex);
+    const fixedFoods = foods.filter(f => !f.flex && !pinnedIds.has(f.id));
+    const flexFoods = foods.filter(f => f.flex && !pinnedIds.has(f.id));
     [...fixedFoods, ...flexFoods].forEach(it => {
       const clusters = it.flex || [it.cluster];
       if (!tryPlace(it, FOOD_PREF[it.slot] || FOOD_PREF.meal, clusters)) unplaced.push(it);
@@ -993,6 +1050,7 @@
     if (!state.sel.size) { toast('目前沒有勾選任何項目'); return; }
     if (!confirm(`確定清除全部 ${state.sel.size} 個已勾選項目？\n（已存的行程草稿不會被刪除，隨時可以再套用回來）`)) return;
     state.sel.clear();
+    state.pins = {};
     save(); renderGrid(); renderBar(); renderTools();
     toast('已清除全部勾選');
   }
@@ -1154,6 +1212,7 @@
   }
 
   function rowHtml(r, day) {
+    // day._idx 由 renderResult 指派
     if (r.k === 'fixed') {
       const lk = r.links ? ` <a href="${gmap(r.links.g)}" target="_blank" rel="noopener">📍地圖</a>` +
         (r.links.o ? ` <a href="${esc(r.links.o)}" target="_blank" rel="noopener">🌐官網</a>` : '') : '';
@@ -1214,6 +1273,7 @@
     const ci = catInfo(it);
     return entryHtml(fmtT(r.t), label, `
       <div class="e-name">${ci.icon} ${esc(it.name)}
+        ${cell.pinned ? '<span class="badge pin">📌 手動指定</span>' : ''}
         ${cell.suggest ? '<span class="badge sug">推薦補位・未勾選</span>' : ''}
         ${it.tag ? `<span class="badge tag">${esc(it.tag)}</span>` : ''}
         <span class="stay">⏳ 停留約${durTxt(r.stay)}</span></div>
@@ -1221,7 +1281,23 @@
       ${it.wait ? `<div class="e-meta sub">⏱ ${esc(it.wait)}</div>` : ''}
       ${siblings(it).length ? `<div class="e-meta sub">🏪 走不到也沒關係：${siblings(it).map(s => esc(s.area)).join('、')}也有分店</div>` : ''}
       ${it.close != null && r.end > it.close ? `<div class="e-meta warnline">⚠️ 這家約 ${fmtT(it.close)} 打烊，此時段可能來不及——建議提前或改選同品牌其他分店</div>` : ''}
-      <div class="e-desc">${esc(it.desc)}</div>${linkRow(it.links, imgQ(it))}`);
+      <div class="e-desc">${esc(it.desc)}</div>${linkRow(it.links, imgQ(it))}
+      ${editBar(it, day, r.slotKey, cell)}`);
+  }
+
+  /* 手動調整列：搬到別天／改時段／移除，改完會自動重排整份行程 */
+  function editBar(it, day, slotKey, cell) {
+    if (!day || cell.suggest) return '';
+    const di = day._idx;
+    const opts = (day.slotKeys || []).filter(k => k !== 'd5shop').map(k =>
+      `<option value="${k}"${k === slotKey ? ' selected' : ''}>${SLOT_LABELS[k] || k}</option>`).join('');
+    return `<div class="e-edit no-print">
+      <span class="ed-lab">調整</span>
+      <button class="ed" data-mv="${it.id}|${di - 1}"${di <= 0 ? ' disabled' : ''} title="移到前一天">◀ ${di > 0 ? 'Day' + di : '前一天'}</button>
+      <button class="ed" data-mv="${it.id}|${di + 1}"${di >= 4 ? ' disabled' : ''} title="移到後一天">${di < 4 ? 'Day' + (di + 2) : '後一天'} ▶</button>
+      <select class="ed-sel" data-slot="${it.id}|${di}">${opts}</select>
+      <button class="ed del" data-drop="${it.id}" title="從行程移除">✕ 移除</button>
+    </div>`;
   }
 
   function versionBarHtml() {
@@ -1243,6 +1319,7 @@
     const c = counts();
     const dayHtml = plan.days.map((d, i) => {
       const cl = CLUSTERS[d.cluster];
+      d._idx = i;
       const rows = d.tl.map(r => rowHtml(r, d)).join('');
       const backup = d.backup.length ? `
         <div class="backup"><b>⏸ 同區備選${d.overflow ? `（為了在 ${fmtT(d.curfew || 1290)} 前回到飯店，以下排不進去——想去的話建議換掉上面某一站，或移到別天）` : '（時間排不下，可自行替換）'}</b>${d.backup.map(it => {
@@ -1261,6 +1338,7 @@
       const heavy = (d.transMins || 0) >= 150;
       const transTip = d.seq && d.seq.length ? `<div class="tip${heavy ? ' holiday' : ''}">🧭 本日交通：${modeBits.join('＋') || '皆在步行圈'}｜<b>總移動約${durTxt(d.transMins || 0)}、${(d.transKm || 0).toFixed(1)}公里</b>｜交通費預估 ${money(d.transCost || 0)}（2人合計）${heavy ? '——移動偏多，可考慮把最遠的一站換成同區其他選擇' : ''}。${d.curfew ? `本日目標 ${fmtT(d.curfew)} 前回到飯店${d.farDay ? '（有遠程景點，已放寬）' : ''}。` : ''}時間為保守估算（含候車與緩衝）。</div>` : '';
       const squeezeTip = d.squeeze ? `<div class="tip holiday">⚠️ 離場前時間較緊：建議把部分採買或用餐提前，或改到機場解決。</div>` : '';
+      const pinClosedTip = (d.pinnedClosed && d.pinnedClosed.length) ? `<div class="tip holiday">📌 你手動把 ${d.pinnedClosed.map(x => esc(x.name)).join('、')} 排在這天，但它<b>週${DOW_TXT[d.dow]}公休</b>——行程照你的安排保留，出發前請再確認。</div>` : '';
       const closedTip = (d.closedShops && d.closedShops.length) ? `<div class="tip holiday">🚫 ${d.closedShops.map(g => esc(g.store.name)).join('、')}<b>本日（週${DOW_TXT[d.dow]}）公休</b>，這區沒有其他天可以排——${d.closedShops.map(g => g.items.map(i => esc(i.name)).join('、')).join('；')} 需要另外找地方買，或出發前先確認營業狀況。</div>` : '';
       const mealTip = (d.noLunch || d.noDinner) ? `<div class="tip holiday">🍽️ 這天${d.noLunch && d.noDinner ? '中午與晚上都' : d.noLunch ? '中午' : '晚上'}沒有安排用餐——${d.noLunch && !d.noDinner ? '上午的行程較滿，記得在景點附近先墊個東西' : '建議從下面的同區備選挑一家，或在附近隨機找一家'}。</div>` : '';
       const lunchTip = d.lunchDropped ? `<div class="tip">🍜 登機前時間有限，午餐建議外帶輕食或在機場用餐（金海機場餐飲選擇不少）。</div>` : '';
@@ -1272,7 +1350,7 @@
         </header>
         ${dayTips[d.key] ? `<div class="tip holiday">${esc(dayTips[d.key])}</div>` : ''}
         <div class="tip">🚇 ${esc(TRANSIT[d.cluster])}</div>
-        ${transTip}${squeezeTip}${closedTip}${mealTip}${lunchTip}
+        ${transTip}${squeezeTip}${pinClosedTip}${closedTip}${mealTip}${lunchTip}
         <div class="timeline">${rows}</div>
         ${backup}
       </section>`;
@@ -1325,12 +1403,14 @@
             ${plan.shopCost ? `<div class="sub">🛍️ 購物清單全買約 ${money(plan.shopCost)}</div>` : ''}</div>
         </div>
         <div class="ov-wrap"><b>勾選總覽：</b>${overview}</div>
+        <div class="ov-wrap edit-hint no-print">✏️ <b>可以手動微調：</b>每個行程項目下方都有「調整」列——<b>◀ ▶</b> 把它搬到別天、<b>時段選單</b>改成當天的其他時段、<b>✕ 移除</b>拿掉不想去的。改完系統會立刻重排整份行程（交通、用餐時間、回飯店時間都會重新計算），手動指定的項目會標上 📌 並優先保留。</div>
         ${versionBarHtml()}
         <div class="r-actions no-print">
           <button id="copyText">📋 複製文字版行程</button>
           <button id="copyLink">🔗 複製行程連結分享</button>
           <button id="sheetBtn" class="gsbtn">📊 Google 試算表</button>
           <button id="printBtn">🖨️ 列印／存 PDF</button>
+          ${Object.keys(state.pins).length ? `<button id="resetPins" class="rst">↩️ 還原自動安排（已手動調整 ${Object.keys(state.pins).length} 項）</button>` : ''}
         </div>
       </header>
       ${dayHtml}
@@ -1343,6 +1423,7 @@
       ${sheetModalHtml()}`;
 
     $('#backBtn').addEventListener('click', () => { state.fromShare = false; showPick(); });
+
     $('#copyText').addEventListener('click', () => copyToClipboard(planText(plan), '#copyText', '📋 已複製！貼到 LINE 給旅伴看吧'));
     $('#copyLink').addEventListener('click', () => copyToClipboard(shareUrl(), '#copyLink', '🔗 連結已複製！'));
     $('#printBtn').addEventListener('click', () => window.print());
@@ -1651,15 +1732,19 @@
   }
 
   /* ---------- 視圖切換 ---------- */
-  function showResult() {
+  function showResult(keepScroll) {
     save();
-    snapshotVersion();
+    if (!keepScroll) snapshotVersion();   // 手動微調不另存版本，避免版本清單被灌爆
     const plan = generate();
     renderResult(plan);
     $('#pick').style.display = 'none';
     $('#result').style.display = '';
-    window.scrollTo({ top: 0 });
-    try { history.replaceState(null, '', location.pathname + '?s=' + [...state.sel].sort().join('.') + (state.autoFill ? '' : '&af=0')); } catch (e) {}
+    if (!keepScroll) window.scrollTo({ top: 0 });
+    try {
+      const p = encPins();
+      history.replaceState(null, '', location.pathname + '?s=' + [...state.sel].sort().join('.') +
+        (state.autoFill ? '' : '&af=0') + (p ? '&p=' + p : ''));
+    } catch (e) {}
   }
   function showPick() {
     $('#result').style.display = 'none';
@@ -1670,7 +1755,47 @@
   }
 
   /* ---------- 事件 ---------- */
+  /* 手動調整：改完就地重排並回到原捲動位置 */
+  function reflow(msg) {
+    const y = window.scrollY;
+    save();
+    showResult(true);
+    window.scrollTo({ top: y });
+    if (msg) toast(msg);
+  }
+  /* 結果頁的委派事件只綁一次——#result-inner 不會被重建，
+     每次渲染都重綁會讓同一次點擊觸發 N 個處理器（呼叫次數指數成長） */
+  function bindResultEvents() {
+    $('#result-inner').addEventListener('click', e => {
+      if (e.target.closest('#resetPins')) { state.pins = {}; reflow('已還原成系統自動安排'); return; }
+      const mv = e.target.closest('[data-mv]');
+      const dp = e.target.closest('[data-drop]');
+      if (mv) {
+        const [id, d] = mv.dataset.mv.split('|');
+        const di = +d;
+        if (di < 0 || di > 4) return;
+        state.pins[id] = { d: di, s: null, t: Date.now() };   // 換天時不鎖時段，讓系統找最順的
+        reflow(`已把「${DB[id].name}」移到 Day ${di + 1}，其他行程已重新調整`);
+      } else if (dp) {
+        const id = dp.dataset.drop;
+        const nm = DB[id] ? DB[id].name : '';
+        state.sel.delete(id);
+        delete state.pins[id];
+        if (!ready()) { state.sel.add(id); toast('至少要保留 3 個景點與 6 家餐飲，這項沒有移除'); return; }
+        reflow(`已移除「${nm}」，行程重新排好了`);
+      }
+    });
+    $('#result-inner').addEventListener('change', e => {
+      const sel = e.target.closest('[data-slot]');
+      if (!sel) return;
+      const [id, d] = sel.dataset.slot.split('|');
+      state.pins[id] = { d: +d, s: sel.value, t: Date.now() };
+      reflow(`已把「${DB[id].name}」改到「${SLOT_LABELS[sel.value] || sel.value}」時段`);
+    });
+  }
+
   function bindEvents() {
+    bindResultEvents();
     $('#tabs').addEventListener('click', e => {
       const b = e.target.closest('[data-tab]'); if (!b) return;
       state.tab = b.dataset.tab; renderChips(); renderGrid();
@@ -1758,7 +1883,7 @@
     });
   }
   function toggle(id, card) {
-    if (state.sel.has(id)) state.sel.delete(id); else state.sel.add(id);
+    if (state.sel.has(id)) { state.sel.delete(id); delete state.pins[id]; } else state.sel.add(id);
     const on = state.sel.has(id);
     card.classList.toggle('on', on);
     card.setAttribute('aria-checked', on);

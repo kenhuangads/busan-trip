@@ -354,3 +354,24 @@ small { color: var(--ink-3); font-weight: 400; }
   .links a { color: #333; }
   .hero { display: none; }
 }
+
+/* ── v5：行程手動調整列 ───────────── */
+.e-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--line); }
+.ed-lab { font-size: 11.5px; color: var(--ink-3); margin-right: 2px; }
+.ed {
+  border: 1.5px solid var(--line); background: #fff; color: var(--ink-2);
+  border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; transition: .15s;
+}
+.ed:hover:not(:disabled) { border-color: var(--ocean); color: var(--ocean); }
+.ed:disabled { opacity: .35; cursor: not-allowed; }
+.ed.del:hover { border-color: var(--warn); color: var(--warn); }
+.ed-sel {
+  border: 1.5px solid var(--line); background: #fff; color: var(--ink-2); font-family: inherit;
+  border-radius: 999px; padding: 3px 8px; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.ed-sel:focus { outline: none; border-color: var(--ocean); }
+.badge.pin { background: #e8f0ff; color: #2b5fa8; border: 1px solid #b9cef0; }
+.r-actions button.rst { background: var(--sun); color: #4a3200; }
+@media print { .e-edit { display: none !important; } }
+.ov-wrap.edit-hint { background: #f2f8ff; border-left: 4px solid var(--ocean); font-size: 12.8px; color: var(--ink-2); }
+.ov-wrap.edit-hint b { color: var(--ocean-deep); }
