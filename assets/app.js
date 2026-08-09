@@ -883,6 +883,50 @@
       if (!d.backup.length) d.overflow = false;
     });
 
+    /* 備選項目：估算它可以排到哪幾天，讓使用者一鍵換進正選 */
+    const dayFreeSlots = d => (d.slotKeys || []).filter(k => k !== 'd5shop' && !d.slots[k]);
+    days.forEach(d => {
+      (d.backup || []).forEach(it => {
+        const key = it.kind === 'spot' ? 'SPOT' : it.slot;
+        it._fit = days.map((dd, i) => {
+          if (dd.key === 'd5') return null;                       // 返程日不塞
+          if (!openOnDay(it, dd)) return null;                    // 這天公休
+          const free = dayFreeSlots(dd);
+          const hasSlot = free.some(k => (ACCEPT[k] || []).includes(key) && slotOpen(it, k));
+          const pts = dayPoints(dd);
+          const km = pts.length ? nearestKm(pts, it) : havKm(HOTEL, it);
+          const near = (it.flex || [it.cluster]).indexOf(dd.cluster) >= 0;
+          const extra = Math.round(km * 2 * 3 + (it.stay || 60));  // 每公里約3分鐘來回
+          const back = (dd.tl || []).filter(r => r.k === 'hotel').pop();
+          const room = (dd.curfew || 1290) - (back ? back.t : 1290);
+          // 沒空位或會超時 → 仍然可以排，但會擠掉當天某一項
+          return { i, km, near, fits: hasSlot && extra <= room + 20 };
+        }).filter(Boolean)
+          .sort((a, b) => (b.fits - a.fits) || (b.near - a.near) || (a.km - b.km));
+      });
+    });
+
+    /* 車程偏多的日子：算出拿掉哪一站最省，給具體可行動的建議 */
+    days.forEach(d => {
+      d.hog = null;
+      if (!d.seq || d.seq.length < 3 || (d.transMins || 0) < 150) return;
+      const base = d.transMins;
+      let best = null;
+      d.seq.forEach((st, i) => {
+        if (st.type === 'd5shop') return;
+        const seq2 = d.seq.slice(); seq2.splice(i, 1);
+        const tmp = { key: d.key, cluster: d.cluster, seq: seq2, backup: [], slots: d.slots, slotKeys: d.slotKeys, dow: d.dow };
+        computeTimeline(tmp);
+        const save = base - (tmp.transMins || 0);
+        if (!best || save > best.save) {
+          const nm = st.type === 'store' ? st.store.name
+            : (st.cell && st.cell.item ? st.cell.item.name : (st.cell && st.cell.anchor ? st.cell.anchor.name : ''));
+          best = { save, name: nm, km: (d.transKm || 0) - (tmp.transKm || 0) };
+        }
+      });
+      if (best && best.save >= 20) d.hog = best;   // 省得夠多才值得建議
+    });
+
     /* 仍然缺餐就標示出來，別讓人餓半天還不知道 */
     days.forEach(d => {
       if (!d.full) return;
@@ -1324,7 +1368,14 @@
       const backup = d.backup.length ? `
         <div class="backup"><b>⏸ 同區備選${d.overflow ? `（為了在 ${fmtT(d.curfew || 1290)} 前回到飯店，以下排不進去——想去的話建議換掉上面某一站，或移到別天）` : '（時間排不下，可自行替換）'}</b>${d.backup.map(it => {
           const ci = catInfo(it);
-          return `<div class="bk-item">${ci.icon} ${esc(it.name)}｜💰 ${esc(it.price || '')} ${linkRow(it.links, imgQ(it))}</div>`;
+          const fit = (it._fit || []).slice(0, 3);
+          const btns = fit.length
+            ? fit.map((f, k) => `<button class="ed ${k === 0 ? 'go' : ''}" data-mv="${it.id}|${f.i}"
+                title="${f.fits ? '這天還有空檔，排得下' : '這天已經排滿，加進去會把當天某一項換到備選'}">✚ Day${f.i + 1}${
+                  k === 0 ? (f.fits ? '（順路建議）' : '（建議・會換掉一項）') : (f.fits ? '' : '⚠️')}</button>`).join('')
+            : '<span class="bk-none">這幾天店家都公休，排不進去</span>';
+          return `<div class="bk-item"><div class="bk-main">${ci.icon} ${esc(it.name)}｜💰 ${esc(it.price || '')} ${linkRow(it.links, imgQ(it))}</div>
+            <div class="bk-act no-print">${btns}</div></div>`;
         }).join('')}</div>` : '';
       const dayTips = {
         d1: '🌕 ' + CONFIG.holidayNote,
@@ -1336,7 +1387,7 @@
       if (mc.metro) modeBits.push(`地鐵${mc.metro}段`);
       if (mc.walk) modeBits.push(`步行${mc.walk}段`);
       const heavy = (d.transMins || 0) >= 150;
-      const transTip = d.seq && d.seq.length ? `<div class="tip${heavy ? ' holiday' : ''}">🧭 本日交通：${modeBits.join('＋') || '皆在步行圈'}｜<b>總移動約${durTxt(d.transMins || 0)}、${(d.transKm || 0).toFixed(1)}公里</b>｜交通費預估 ${money(d.transCost || 0)}（2人合計）${heavy ? '——移動偏多，可考慮把最遠的一站換成同區其他選擇' : ''}。${d.curfew ? `本日目標 ${fmtT(d.curfew)} 前回到飯店${d.farDay ? '（有遠程景點，已放寬）' : ''}。` : ''}時間為保守估算（含候車與緩衝）。</div>` : '';
+      const transTip = d.seq && d.seq.length ? `<div class="tip${heavy ? ' holiday' : ''}">🧭 本日交通：${modeBits.join('＋') || '皆在步行圈'}｜<b>總移動約${durTxt(d.transMins || 0)}、${(d.transKm || 0).toFixed(1)}公里</b>｜交通費預估 ${money(d.transCost || 0)}（2人合計）${heavy && d.hog ? `——<b>其中「${esc(d.hog.name)}」最花時間</b>：把它移到別天（用下方項目的「調整」列）可省下約 ${durTxt(d.hog.save)} 車程、少繞 ${d.hog.km.toFixed(1)} 公里` : heavy ? '——移動偏多，可考慮把最遠的一站換成同區其他選擇' : ''}。${d.curfew ? `本日目標 ${fmtT(d.curfew)} 前回到飯店${d.farDay ? '（有遠程景點，已放寬）' : ''}。` : ''}時間為保守估算（含候車與緩衝）。</div>` : '';
       const squeezeTip = d.squeeze ? `<div class="tip holiday">⚠️ 離場前時間較緊：建議把部分採買或用餐提前，或改到機場解決。</div>` : '';
       const pinClosedTip = (d.pinnedClosed && d.pinnedClosed.length) ? `<div class="tip holiday">📌 你手動把 ${d.pinnedClosed.map(x => esc(x.name)).join('、')} 排在這天，但它<b>週${DOW_TXT[d.dow]}公休</b>——行程照你的安排保留，出發前請再確認。</div>` : '';
       const closedTip = (d.closedShops && d.closedShops.length) ? `<div class="tip holiday">🚫 ${d.closedShops.map(g => esc(g.store.name)).join('、')}<b>本日（週${DOW_TXT[d.dow]}）公休</b>，這區沒有其他天可以排——${d.closedShops.map(g => g.items.map(i => esc(i.name)).join('、')).join('；')} 需要另外找地方買，或出發前先確認營業狀況。</div>` : '';
@@ -1418,6 +1469,7 @@
       <footer class="r-foot">
         <div class="tip">📱 <b>排隊神器：</b>多數名店可用 CatchTable（有外國人版 CatchTable Global App）遠端抽號；現場機台可輸入 Email 登記並拍下 QR Code 留存。</div>
         <div class="tip">💡 ${esc(CONFIG.rateNote)}</div>
+        <div class="tip buildtip">🔄 版本 ${esc(CONFIG.build || '-')}｜手機若看不到新功能（例如每個項目下方的「調整」列），代表載到快取的舊版：下拉重新整理，或關掉分頁重開即可。</div>
         <div class="tip">🎫 天空膠囊列車、遊艇、X the SKY 建議出發前 2 週完成線上預約；Spa Land 可先在 Klook/NOL 買優惠票。</div>
       </footer>
       ${sheetModalHtml()}`;
