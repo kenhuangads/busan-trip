@@ -300,6 +300,10 @@
   const openOnDay = (o, day) =>
     !(o && o.closedDow && day && day.dow != null && o.closedDow.indexOf(day.dow) >= 0);
 
+  // 正餐＝會吃飽的一頓（咖啡／甜點／小吃不算），用來檢查兩餐間隔
+  const isRealMeal = it => it && it.kind === 'food' &&
+    ['brunch', 'lunch', 'dinner', 'meal'].indexOf(it.slot) >= 0;
+
   const isMealStop = st => st.type === 'cell' && st.cell && st.cell.item && MEAL_SLOTS.indexOf(st.slotKey) >= 0;
   function timingOk(tl) {
     return tl.every(r => {
@@ -550,6 +554,8 @@
     let time = day.key === 'd1' ? 820 : day.key === 'd5' ? 520
       : (day.seq[0] && day.seq[0].slotKey === 'brunch' ? 525 : 570);
     let transCost = 0, transMins = 0, transKm = 0;
+    let lastMeal = -999;                       // 上一頓正餐的開始時間
+    const MEAL_GAP = (CONFIG.mealGap != null) ? CONFIG.mealGap : 210;
     const modeCnt = { walk: 0, taxi: 0, metro: 0 };
 
     day.seq.forEach(stop => {
@@ -574,6 +580,10 @@
         transCost += tr.fare2; transMins += tr.mins; transKm += (tr.km || 0);
         modeCnt[tr.mode]++;
       }
+      // 剛吃完沒多久不會再吃一頓 —— 正餐之間至少間隔 3.5 小時
+      const mealItem = stop.type === 'cell' && stop.cell && isRealMeal(stop.cell.item);
+      if (mealItem && start < lastMeal + MEAL_GAP) start = ceil5(lastMeal + MEAL_GAP);
+      if (mealItem) lastMeal = start;
       const stay = stayOfStop(stop, day);
       const end = start + stay;
       if (stop.type === 'store') rows.push({ k: 'store', t: start, end, stay, g: stop });
@@ -1269,8 +1279,13 @@
         <div class="e-body"><div class="trans-body">${esc(r.tr.desc)}<b>　→ ${fmtT(r.arr)} 抵達</b></div></div></div>`;
     }
     if (r.k === 'free') {
+      const fill = r.mins >= 80 ? gapSuggest(day, r) : [];
+      const btns = fill.length
+        ? `<div class="gap-fill no-print"><span class="gf-lab">要不要順便安排：</span>${fill.map(f =>
+            `<button class="ed go" data-add="${f.it.id}|${day._idx}" title="${esc(f.it.area || '')}｜停留約${durTxt(f.it.stay || 60)}">✚ ${esc(f.it.name.slice(0, 12))}<em>${f.km < 1 ? '走路可到' : f.km.toFixed(1) + 'km'}</em></button>`).join('')}</div>`
+        : '';
       return `<div class="entry free"><div class="t"><span class="clock sm">${fmtT(r.t)}</span><span class="slotlab">空檔</span></div>
-        <div class="e-body"><div class="free-body">🌿 自由時間約${durTxt(r.mins)}——可回飯店休息、周邊隨逛，或提早出發慢慢走</div></div></div>`;
+        <div class="e-body"><div class="free-body">🌿 自由時間約${durTxt(r.mins)}——可回飯店休息、周邊隨逛，或提早出發慢慢走</div>${btns}</div></div>`;
     }
     if (r.k === 'hotel') {
       const cf = r.curfew;
@@ -1344,6 +1359,29 @@
       <select class="ed-sel" data-slot="${it.id}|${di}">${opts}</select>
       <button class="ed del" data-drop="${it.id}" title="從行程移除">✕ 移除</button>
     </div>`;
+  }
+
+  /* ---- 空檔建議 ----
+     空檔夠長時，從沒勾選的項目裡挑「離當天路線最近、時段合適、塞得進去」的幾個。 */
+  function gapSuggest(day, freeRow) {
+    if (!day || day.key === 'd5') return [];
+    const pts = dayPoints(day);
+    if (!pts.length) return [];
+    const used = new Set();
+    ALL.forEach(it => { if (state.sel.has(it.id)) used.add(it.brand || it.id); });
+    const budget = freeRow.mins - 20;               // 留 20 分鐘給來回交通
+    const at = freeRow.t;
+    const cand = [...SPOTS, ...FOODS].filter(it => {
+      if (state.sel.has(it.id) || used.has(it.brand || '###')) return false;
+      if (!openOnDay(it, day)) return false;
+      if (it.open != null && at < it.open) return false;
+      if (it.close != null && at + (it.stay || 60) > it.close - 15) return false;
+      if (isRealMeal(it)) return false;             // 空檔用來塞正餐容易撞用餐間隔
+      if ((it.stay || 60) > budget) return false;
+      return nearestKm(pts, it) <= 3.5;             // 太遠就不算「順便」
+    }).map(it => ({ it, km: nearestKm(pts, it) }))
+      .sort((a, b) => ((b.it.rec || 0) - 5 * b.km) - ((a.it.rec || 0) - 5 * a.km));
+    return cand.slice(0, 3);
   }
 
   /* ---- 當日路線圖 ----
@@ -1928,6 +1966,14 @@
   function bindResultEvents() {
     $('#result-inner').addEventListener('click', e => {
       if (e.target.closest('#resetPins')) { state.pins = {}; reflow('已還原成系統自動安排'); return; }
+      const ad = e.target.closest('[data-add]');
+      if (ad) {
+        const [id, d] = ad.dataset.add.split('|');
+        state.sel.add(id);
+        state.pins[id] = { d: +d, s: null, t: Date.now() };
+        reflow(`已把「${DB[id].name}」加進 Day ${+d + 1} 的空檔，行程重新排好了`);
+        return;
+      }
       const mv = e.target.closest('[data-mv]');
       const dp = e.target.closest('[data-drop]');
       if (mv) {
