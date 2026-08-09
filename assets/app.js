@@ -1943,8 +1943,35 @@
     save(); renderBar(); renderTools();
   }
 
+  /* ---------- 版本檢查 ----------
+     靜態站最惱人的問題：手機快取住舊的 index.html，就會一直載到舊版資源、
+     看不到新功能。這裡主動比對伺服器上的版本，不同就跳出更新提示。 */
+  function checkStale() {
+    const el = $('script[src*="app.js"]');
+    const cur = (String(el && el.getAttribute('src')).match(/v=([\w.]+)/) || [])[1];
+    if (!cur) return;
+    fetch(location.pathname + '?nc=' + Date.now(), { cache: 'no-store' })
+      .then(r => r.ok ? r.text() : Promise.reject())
+      .then(t => {
+        const latest = (t.match(/app\.js\?v=([\w.]+)/) || [])[1];
+        if (!latest || latest === cur) return;
+        const bar = document.createElement('div');
+        bar.id = 'updbar';
+        bar.innerHTML = '<span>🔄 有新版本（' + esc(latest) + '），你現在看到的是舊版 ' + esc(cur) +
+          '</span><button id="updBtn">立即更新</button>';
+        document.body.appendChild(bar);
+        $('#updBtn').addEventListener('click', () => {
+          const u = new URL(location.href);
+          u.searchParams.set('_v', latest);
+          location.replace(u.toString());
+        });
+      })
+      .catch(() => {});
+  }
+
   /* ---------- 啟動 ---------- */
   function init() {
+    checkStale();
     const shared = parseUrl();
     if (!shared) load();
     renderChips(); renderGrid(); renderBar(); renderTools(); bindEvents();
