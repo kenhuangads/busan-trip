@@ -1346,6 +1346,111 @@
     </div>`;
   }
 
+  /* ---- 當日路線圖 ----
+     用真實經緯度等距投影，一眼看出當天在地圖上怎麼跑、每段多遠。
+     線條顏色＝交通方式，動畫讓路線依序畫出來（也標出回飯店的路徑）。 */
+  function routeMapHtml(day) {
+    if (!day.tl || !day.seq || !day.seq.length) return '';
+    const stops = [], legs = [];
+    day.tl.forEach(r => {
+      if (r.k === 'trans') legs.push(r);
+      else if (r.k === 'item' || r.k === 'store' || r.k === 'd5shop') {
+        let p, nm;
+        if (r.k === 'store') { p = r.g.store; nm = r.g.store.name; }
+        else if (r.k === 'd5shop') { p = STORES.oy_seomyeon; nm = '西面最終採購'; }
+        else if (r.cell.anchor) {
+          const am = ANCHOR_META[day.cluster] || ANCHOR_META.seomyeon;
+          p = am; nm = r.cell.anchor.name;
+        } else { p = r.cell.item; nm = r.cell.item.name; }
+        if (p && p.lat != null) stops.push({ lat: p.lat, lng: p.lng, name: nm, t: r.t });
+      }
+    });
+    if (stops.length < 1) return '';
+
+    const pts = [HOTEL].concat(stops);
+    if (day.tl.some(r => r.k === 'hotel')) pts.push(HOTEL);
+    const lat0 = 35.16, kx = Math.cos(lat0 * Math.PI / 180);
+    const xs = pts.map(p => p.lng * kx), ys = pts.map(p => p.lat);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const spanX = Math.max(maxX - minX, 1e-5), spanY = Math.max(maxY - minY, 1e-5);
+    // 畫布長寬比跟著實際路線走（釜山東西向常比南北向長很多），但不要太扁
+    const W = 100, PAD = 12;
+    const H = Math.min(120, Math.max(46, Math.round(W * spanY / spanX)));
+    const scale = Math.min((W - PAD * 2) / spanX, (H - PAD * 2) / spanY);
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    const px = p => W / 2 + (p.lng * kx - cx) * scale;
+    const py = p => H / 2 + (cy - p.lat) * scale;
+
+    const MODE = { walk: '#1f9d63', metro: '#1f5fbf', taxi: '#e8833a' };
+    let path = '', dots = '', labels = '', total = 0;
+    const legLabels = [];
+    pts.forEach((p, i) => {
+      if (i === 0) return;
+      const a = pts[i - 1], leg = legs[i - 1];
+      const col = leg ? (MODE[leg.tr.mode] || '#8794a8') : '#c9d2e0';
+      const dash = leg && leg.tr.mode === 'walk' ? '2 2' : '';
+      const x1 = px(a).toFixed(1), y1 = py(a).toFixed(1), x2 = px(p).toFixed(1), y2 = py(p).toFixed(1);
+      total += leg ? (leg.tr.km || 0) : 0;
+      path += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="1.6"
+        stroke-linecap="round"${dash ? ` stroke-dasharray="${dash}"` : ''} class="rt-line" style="animation-delay:${i * .18}s"/>`;
+      if (leg) legLabels.push({ km: leg.tr.km || 0, x: (+x1 + +x2) / 2, y: (+y1 + +y2) / 2 });
+    });
+    // 只標最長的幾段，且互相太近就跳過——小圖上文字疊在一起完全看不懂
+    const lblPos = [];
+    legLabels.sort((a, b) => b.km - a.km).forEach(L => {
+      if (L.km < 1 || lblPos.length >= 3) return;
+      if (lblPos.some(q => Math.hypot(q.x - L.x, q.y - L.y) < 13)) return;
+      lblPos.push(L);
+      labels += `<text x="${L.x.toFixed(1)}" y="${(L.y - 1.8).toFixed(1)}" class="rt-km">${L.km < 10 ? L.km.toFixed(1) : Math.round(L.km)}km</text>`;
+    });
+
+    const placed = [];
+    stops.forEach((p, i) => {
+      let x = px(p), y = py(p);
+      // 兩點實際位置太近時稍微錯開，否則編號會疊在一起看不出來
+      for (let g = 0; g < 12; g++) {
+        const hit = placed.find(q => Math.hypot(q.x - x, q.y - y) < 7);
+        if (!hit) break;
+        const ang = g * 1.05;
+        x = px(p) + Math.cos(ang) * 7; y = py(p) + Math.sin(ang) * 7;
+      }
+      placed.push({ x, y });
+      dots += `<g class="rt-dot" style="animation-delay:${(i + 1) * .18}s">
+        <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.6" fill="#fff" stroke="var(--c, #1f5fbf)" stroke-width="1.6"/>
+        <text x="${x.toFixed(1)}" y="${(y + 1.5).toFixed(1)}" class="rt-no">${i + 1}</text></g>`;
+    });
+    const hx = px(HOTEL).toFixed(1), hy = py(HOTEL).toFixed(1);
+    dots += `<g class="rt-dot"><circle cx="${hx}" cy="${hy}" r="4.4" fill="#1d2733"/>
+      <text x="${hx}" y="${(+hy + 1.7).toFixed(1)}" class="rt-no" fill="#fff">🏨</text></g>`;
+
+    // 比例路線條：段落長度＝實際距離，顏色＝交通方式
+    const MODE_TXT = { walk: '步行', metro: '地鐵', taxi: '計程車' };
+    let strip = '<span class="rt-node hotel" title="樂天飯店">🏨</span>';
+    stops.forEach((p, i) => {
+      const leg = legs[i];
+      strip += leg
+        ? `<span class="rt-seg" style="--w:${(leg.tr.km || 0).toFixed(1)};--col:${MODE[leg.tr.mode] || '#8794a8'}"
+             title="${MODE_TXT[leg.tr.mode] || ''} ${leg.tr.mins}分"><i>${(leg.tr.km || 0) < 10 ? (leg.tr.km || 0).toFixed(1) : Math.round(leg.tr.km)}km</i></span>`
+        : '<span class="rt-seg" style="--w:0.5;--col:#c9d2e0"></span>';
+      strip += `<span class="rt-node" style="animation-delay:${i * .12}s"><b>${i + 1}</b>${esc(p.name.slice(0, 11))}<em>${fmtT(p.t)}</em></span>`;
+    });
+    const back = legs[stops.length];
+    if (back) strip += `<span class="rt-seg" style="--w:${(back.tr.km || 0).toFixed(1)};--col:${MODE[back.tr.mode] || '#8794a8'}"
+      title="回飯店"><i>${(back.tr.km || 0) < 10 ? (back.tr.km || 0).toFixed(1) : Math.round(back.tr.km)}km</i></span><span class="rt-node hotel">🏨</span>`;
+
+    return `<div class="routemap">
+      <div class="rt-head">
+        <span class="rt-title">🗺️ 今日路線 · 共 ${total.toFixed(1)} 公里 · ${durTxt(day.transMins || 0)}</span>
+        <span class="rt-legend"><b style="color:${MODE.walk}">━步行</b><b style="color:${MODE.metro}">━地鐵</b><b style="color:${MODE.taxi}">━計程車</b></span>
+      </div>
+      <div class="rt-body">
+        <svg viewBox="0 0 ${W} ${H}" class="rt-svg" style="aspect-ratio:${W}/${H}" role="img" aria-label="當日路線地理示意圖">${path}${labels}${dots}</svg>
+        <div class="rt-strip">${strip}</div>
+      </div>
+    </div>`;
+  }
+
   function versionBarHtml() {
     const vs = loadVers();
     if (!vs.length) return '';
@@ -1404,6 +1509,7 @@
         ${dayTips[d.key] ? `<div class="tip holiday">${esc(dayTips[d.key])}</div>` : ''}
         <div class="tip">🚇 ${esc(TRANSIT[d.cluster])}</div>
         ${transTip}${squeezeTip}${pinClosedTip}${closedTip}${mealTip}${lunchTip}
+        ${routeMapHtml(d)}
         <div class="timeline">${rows}</div>
         ${backup}
       </section>`;

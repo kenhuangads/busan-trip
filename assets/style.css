@@ -394,3 +394,66 @@ small { color: var(--ink-3); font-weight: 400; }
   border-radius: 999px; padding: 7px 16px; font-size: 13.5px; white-space: nowrap;
 }
 @media print { #updbar { display: none !important; } }
+
+/* ── v6：當日路線圖（地理示意 ＋ 比例路線條） ── */
+.routemap {
+  background: linear-gradient(160deg, #f7fbff, #eef4fb);
+  border: 1px solid #dbe6f5; border-radius: 14px; padding: 11px 13px; margin: 10px 0;
+}
+.rt-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 9px; }
+.rt-title { font-size: 13.5px; font-weight: 800; color: var(--ocean-deep); }
+.rt-legend { display: flex; gap: 10px; font-size: 11px; color: var(--ink-3); }
+.rt-body { display: flex; gap: 13px; align-items: flex-start; flex-wrap: wrap; }
+.rt-svg {
+  width: 200px; height: auto; flex: none;
+  background: #fff; border-radius: 10px; border: 1px solid #e3ecf8;
+}
+.rt-no { font-size: 4px; font-weight: 800; text-anchor: middle; fill: var(--c, #1f5fbf); }
+.rt-km { font-size: 3.4px; font-weight: 700; text-anchor: middle; fill: #64748b; }
+
+/* 比例路線條：段落長度＝實際距離 */
+.rt-strip { flex: 1 1 300px; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 3px 0; }
+.rt-node {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 1px; flex: none;
+  background: #fff; border: 1.5px solid var(--c, var(--ocean)); border-radius: 10px;
+  padding: 3px 7px; font-size: 11px; color: var(--ink); max-width: 96px; text-align: center;
+  opacity: 0; animation: rtPop .3s ease forwards;
+}
+.rt-node b { font-size: 10px; font-weight: 800; color: var(--c, var(--ocean)); line-height: 1; }
+.rt-node em { font-style: normal; font-size: 9.5px; color: var(--ink-3); }
+.rt-node.hotel { border-color: var(--ink); font-size: 13px; padding: 5px 8px; opacity: 1; animation: none; }
+.rt-seg {
+  flex: 1 1 calc(var(--w, 1) * 5px); min-width: 34px; max-width: 130px;
+  height: 16px; position: relative; display: flex; align-items: center; justify-content: center;
+}
+.rt-seg::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 2.5px;
+  background: var(--col, #c9d2e0); border-radius: 2px; transform: translateY(-50%);
+}
+.rt-seg i {
+  position: relative; font-style: normal; font-size: 9.5px; font-weight: 700;
+  color: var(--col, var(--ink-3)); background: #f4f8fd; padding: 0 3px; border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* 路線依序畫出來 */
+.rt-line { stroke-dasharray: 200; stroke-dashoffset: 200; animation: rtDraw .55s ease forwards; }
+.rt-dot { opacity: 0; animation: rtPop .3s ease forwards; transform-box: fill-box; transform-origin: center; }
+@keyframes rtDraw { to { stroke-dashoffset: 0; } }
+@keyframes rtPop { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .rt-line { stroke-dashoffset: 0; animation: none; }
+  .rt-dot, .rt-node { opacity: 1; animation: none; }
+}
+@media (max-width: 640px) {
+  .rt-body { gap: 10px; }
+  .rt-svg { width: 100%; max-width: 320px; margin: 0 auto; }
+  .rt-strip { flex-basis: 100%; }
+  .rt-seg { min-width: 30px; max-width: 90px; }
+  .rt-node { max-width: 84px; font-size: 10.5px; }
+}
+@media print {
+  .routemap { background: #fff; break-inside: avoid; }
+  .rt-line { stroke-dashoffset: 0; animation: none; }
+  .rt-dot, .rt-node { opacity: 1; animation: none; }
+}

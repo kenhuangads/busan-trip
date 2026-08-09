@@ -7,7 +7,7 @@
 
 const CONFIG = {
   baseUrl: 'https://kenhuangads.github.io/busan-trip/',
-  build: '20260803u',   // 版本標示：手機看到的號碼跟這裡不同就是載到舊版（重新整理即可）
+  build: '20260803y',   // 版本標示：手機看到的號碼跟這裡不同就是載到舊版（重新整理即可）
   rateNote: '價格換算基準：1,000韓元 ≈ NT$21.5（2026年7月匯率）。所有金額為 2026 年估算平均範圍，實際以現場為準。',
   minSpots: 3,
   minFoods: 6,
