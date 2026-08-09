@@ -241,10 +241,10 @@
   // 每種 slot 可接受的項目型態
   const ACCEPT = {
     brunch: ['brunch'], morning: ['SPOT'], lunch: ['lunch', 'meal'], afternoon: ['SPOT'],
-    cafe: ['cafe'], sweet: ['dessert', 'snack'], evening: ['SPOT'], dinner: ['dinner', 'meal'],
+    cafe: ['cafe'], sweet: ['dessert', 'snack'], evening: ['SPOT'], dinner: ['dinner', 'meal', 'lunch'],
     night: ['SPOT', 'supper', 'snack', 'dessert'],
     latelunch: ['lunch', 'meal', 'brunch', 'snack'], pmstroll: ['SPOT'], pmcafe: ['cafe', 'dessert'],
-    d1dinner: ['dinner', 'meal'], d1night: ['SPOT', 'supper', 'snack', 'dessert'],
+    d1dinner: ['dinner', 'meal', 'lunch'], d1night: ['SPOT', 'supper', 'snack', 'dessert'],
     d5brunch: ['brunch'], d5lunch: ['lunch', 'meal']
   };
   // 各時段的概略時間，用來比對店家營業時間（避免排到已打烊的時段）
