@@ -7,7 +7,7 @@
 
 const CONFIG = {
   baseUrl: 'https://kenhuangads.github.io/busan-trip/',
-  build: '20260804c',   // 版本標示：手機看到的號碼跟這裡不同就是載到舊版（重新整理即可）
+  build: '20260804d',   // 版本標示：手機看到的號碼跟這裡不同就是載到舊版（重新整理即可）
   rateNote: '價格換算基準：1,000韓元 ≈ NT$21.5（2026年7月匯率）。所有金額為 2026 年估算平均範圍，實際以現場為準。',
   minSpots: 3,
   minFoods: 6,
@@ -63,6 +63,10 @@ const SHOP_CATS = {
 /* ── 景點（10）───────────────────────────────
    slot: morning / afternoon / evening / night */
 const SPOTS = [
+  { id:'s13', kind:'spot', name:'ARTE MUSEUM 釜山', kr:'아르떼뮤지엄 부산', cluster:'nampo', area:'影島・東三洞（南浦站1號線8號出口轉17／186號公車約20分）', slot:'afternoon', est:473,
+    price:'平日成人 22,000₩ ≈ NT$473／人；週末與假日 25,000₩ ≈ NT$538／人（青少年平日 18,000₩、兒童 15,000₩）。Klook／KKday 線上票通常再便宜一些',
+    desc:'d\'strict 打造的沉浸式媒體藝術館，以「永恆自然」為主題，釜山館 5,600 平方公尺是全世界最大的一間——19 件作品裡有 16 件是為釜山全新製作，包括金色沙丘意象的 CIRCLE 與以光為主體的 SUN。整館用高解析投影與環繞音場把瀑布、森林、花海鋪滿整面牆與地板，走進去像掉進畫裡；還有「LIVE SKETCHBOOK」可以把自己畫的圖投上牆一起動起來。全室內、全年無休，下雨天或走累了的午後最適合，看完順路可以接影島的 Momos 咖啡。※19:00 停止入場。',
+    tag:'世界最大・全室內', links:{ g:'아르떼뮤지엄 부산', n:'아르떼뮤지엄 부산', o:'https://kr.artemuseum.com/busan', zh:'https://www.visitbusan.net/zht/index.do?menuCd=DOM_000000601001001000&uc_seq=2091&lang_cd=cnb' } },
   { id:'s01', kind:'spot', name:'海雲台藍線公園（天空膠囊列車）', kr:'해운대 블루라인파크', cluster:'east', area:'海雲台・尾浦', slot:'morning', est:600,
     price:'膠囊列車 2人包廂單程 40,000₩ ≈ NT$860／廂；海岸列車單程 8,000₩ ≈ NT$170／人。最推玩法：膠囊去＋海岸列車回，2人合計約 NT$1,200',
     desc:'釜山最夯打卡景點，復古色彩獨立車廂沿海岸線上空緩行，海景無敵。強烈建議出發前 2 週於官網或 KKday 預約，現場極難買到票。',
@@ -1024,7 +1028,7 @@ const ZONES = {
 const STORES = {
   oy_seomyeon:     { name: 'Olive Young 西面旗艦店', zone: 'seomyeon', lat: 35.1575, lng: 129.0578, stay: 60, open: 600, close: 1350,
     note: '單筆滿 15,000₩ 即可退稅，出示護照現場即時折抵，記得帶護照（10:00 開門）', links: { g: '올리브영 부산 서면점', n: '올리브영 부산 서면점' } },
-  lottedept:       { name: '樂天百貨 釜山本店', zone: 'seomyeon', lat: 35.1552, lng: 129.0596, stay: 75, open: 630, close: 1200,
+  lottedept:       { name: '樂天百貨 釜山本店', zone: 'seomyeon', lat: 35.1569, lng: 129.0562, stay: 75, open: 630, close: 1200,
     note: '與樂天飯店同棟連通，逛完直接回房（10:30 開門）。出示護照多數專櫃可直接以「現場免稅價」結帳；1 樓另設自動退稅機，刷護照＋退稅單當場吐韓元現金。B1 有質感美食街可補體力', links: { g: '롯데백화점 부산본점', n: '롯데백화점 부산본점' } },
   musinsa:         { name: 'MUSINSA STANDARD 西面旗艦店', zone: 'seomyeon', lat: 35.1568, lng: 129.0645, stay: 45, open: 660, close: 1260,
     links: { g: '무신사 스탠다드 서면', n: '무신사 스탠다드 서면' } },
@@ -1182,6 +1186,7 @@ const META = {
   f90: { lat: 35.1558,  lng: 129.0554,  zone: 'seomyeon', stay: 30,  rec: 85, open: 480, close: 1200 },
   s11: { lat: 35.09875, lng: 129.00973, zone: 'gamcheon', stay: 45,  rec: 86, open: 660, close: 1050 },
   s12: { lat: 35.15430, lng: 129.12700, zone: 'millak',   stay: 120, rec: 91, open: 600 },
+  s13: { lat: 35.08693, lng: 129.07656, zone: 'yeongdo',   stay: 120, rec: 88, open: 600, close: 1200 },
   p61: { store: 'ader_space',  rec: 88 },
   p62: { store: 'shinsegae',   rec: 91 },
   p63: { store: 'shinsegae',   rec: 89 },
