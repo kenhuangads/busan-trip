@@ -309,6 +309,9 @@
   // 正餐＝會吃飽的一頓（咖啡／甜點／小吃不算），用來檢查兩餐間隔
   const isRealMeal = it => it && it.kind === 'food' &&
     ['brunch', 'lunch', 'dinner', 'meal'].indexOf(it.slot) >= 0;
+  // 30 分鐘就解決的外帶輕食（早餐三明治、貝果）不等於「一頓正餐」——
+  // 用 3.5 小時把下一餐整個擋掉會排不出行程，只要不緊接著吃就好
+  const isLightMeal = it => isRealMeal(it) && (it.stay || 60) < (CONFIG.lightMealStay || 40);
 
   const isMealStop = st => st.type === 'cell' && st.cell && st.cell.item && MEAL_SLOTS.indexOf(st.slotKey) >= 0;
   function timingOk(tl) {
@@ -562,6 +565,7 @@
     let transCost = 0, transMins = 0, transKm = 0;
     let lastMeal = -999;                       // 上一頓正餐的開始時間
     const MEAL_GAP = (CONFIG.mealGap != null) ? CONFIG.mealGap : 210;
+    let lastGap = MEAL_GAP;                    // 上一頓要求的間隔（輕食減半）
     const modeCnt = { walk: 0, taxi: 0, metro: 0 };
 
     day.seq.forEach(stop => {
@@ -588,8 +592,11 @@
       }
       // 剛吃完沒多久不會再吃一頓 —— 正餐之間至少間隔 3.5 小時
       const mealItem = stop.type === 'cell' && stop.cell && isRealMeal(stop.cell.item);
-      if (mealItem && start < lastMeal + MEAL_GAP) start = ceil5(lastMeal + MEAL_GAP);
-      if (mealItem) lastMeal = start;
+      if (mealItem && start < lastMeal + lastGap) start = ceil5(lastMeal + lastGap);
+      if (mealItem) {
+        lastMeal = start;
+        lastGap = isLightMeal(stop.cell.item) ? Math.round(MEAL_GAP / 2) : MEAL_GAP;
+      }
       const stay = stayOfStop(stop, day);
       const end = start + stay;
       if (stop.type === 'store') rows.push({ k: 'store', t: start, end, stay, g: stop });
