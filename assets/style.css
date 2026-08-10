@@ -185,7 +185,23 @@ small { color: var(--ink-3); font-weight: 400; }
 .r-actions button.done { background: var(--ok); }
 
 .day { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; margin-bottom: 18px; border-top: 5px solid var(--c, var(--ocean)); }
-.day-head { display: flex; gap: 14px; align-items: center; margin-bottom: 10px; }
+.day-head { display: flex; gap: 14px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.day-swap { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.day-swap > span { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.day-swap button {
+  border: 1px solid var(--line); background: #fff; color: var(--ink-2); cursor: pointer;
+  border-radius: 999px; padding: 5px 11px; font-size: 12px; font-weight: 700; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 5px; line-height: 1.2;
+}
+.day-swap button small { font-weight: 500; font-size: 11px; color: var(--ink-3); }
+.day-swap button:hover { border-color: var(--c, var(--ocean)); color: var(--c, var(--ocean)); background: #f7fbff; }
+.day-swap button:hover small { color: inherit; opacity: .75; }
+@media (max-width: 640px) {
+  .day-swap { margin-left: 0; width: 100%; }
+  .day-swap button { padding: 7px 13px; }      /* 手機加大點擊面積 */
+  .day-swap button small { display: none; }
+}
+@media print { .day-swap { display: none; } }
 .day-no {
   background: var(--c, var(--ocean)); color: #fff; font-weight: 800; border-radius: 12px;
   padding: 8px 12px; font-size: 15px; white-space: nowrap;

@@ -78,7 +78,8 @@
     autoFill: true,
     fromShare: false,
     draftOpen: false,
-    pins: {}                // 手動調整：{ 項目id: { d:第幾天(0-4), s:時段key或null } }
+    pins: {},               // 手動調整：{ 項目id: { d:第幾天(0-4), s:時段key或null } }
+    dayCl: null             // 整天對調：Day2-4 各自負責的生活圈，null＝系統自動安排
   };
 
   const gimg = q => 'https://www.google.com/search?udm=2&q=' + encodeURIComponent(q); // Google 圖片搜尋
@@ -119,6 +120,7 @@
       localStorage.setItem('busan_sel_v2', JSON.stringify([...state.sel]));
       localStorage.setItem('busan_af_v2', state.autoFill ? '1' : '0');
       localStorage.setItem('busan_pins_v1', JSON.stringify(state.pins));
+      localStorage.setItem('busan_daycl_v1', JSON.stringify(state.dayCl));
     } catch (e) {}
   }
   function load() {
@@ -127,6 +129,7 @@
       s.forEach(id => { if (DB[id]) state.sel.add(id); });
       state.autoFill = localStorage.getItem('busan_af_v2') !== '0';
       try { state.pins = JSON.parse(localStorage.getItem('busan_pins_v1') || '{}') || {}; } catch (e) { state.pins = {}; }
+      try { state.dayCl = JSON.parse(localStorage.getItem('busan_daycl_v1') || 'null'); } catch (e) { state.dayCl = null; }
     } catch (e) {}
   }
   const encPins = () => Object.entries(state.pins)
@@ -135,7 +138,8 @@
   function shareUrl() {
     const ids = [...state.sel].sort();
     const p = encPins();
-    return CONFIG.baseUrl + '?s=' + ids.join('.') + (state.autoFill ? '' : '&af=0') + (p ? '&p=' + p : '');
+    const dc = state.dayCl ? '&dc=' + state.dayCl.join('.') : '';
+    return CONFIG.baseUrl + '?s=' + ids.join('.') + (state.autoFill ? '' : '&af=0') + (p ? '&p=' + p : '') + dc;
   }
   function parseUrl() {
     const p = new URLSearchParams(location.search);
@@ -151,6 +155,8 @@
       const a = t.split('-');
       if (a[0] && DB[a[0]] && a[1] != null) state.pins[a[0]] = { d: +a[1], s: a[2] || null, t: i };
     });
+    const dc = p.get('dc');
+    state.dayCl = (dc && dc.split('.').length === 3 && dc.split('.').every(c => CLUSTERS[c])) ? dc.split('.') : null;
     state.fromShare = true;
     return true;
   }
@@ -634,7 +640,12 @@
     const bigOrder = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]);
     const fullDays = days.filter(d => d.full);
     const themes = { east: '海雲台・機張 海岸線一日', gwangalli: '廣安里 海景與夜色', nampo: '南浦洞・甘川洞 舊城文化' };
+    // 使用者手動對調過整天 → 直接照他的安排（Day2-4）
+    if (state.dayCl && state.dayCl.length === 3) {
+      fullDays.forEach((d, i) => { if (CLUSTERS[state.dayCl[i]]) d.cluster = state.dayCl[i]; });
+    }
     fullDays.forEach(d => {
+      if (state.dayCl) { d.theme = themes[d.cluster]; return; }   // 手動指定就不再自動改派
       if (cnt[d.cluster] === 0 && cnt[bigOrder[0]] >= 6) {
         d.cluster = bigOrder[0];
         d.theme = themes[bigOrder[0]] + '（續）';
@@ -1107,6 +1118,7 @@
     if (!confirm(`確定清除全部 ${state.sel.size} 個已勾選項目？\n（已存的行程草稿不會被刪除，隨時可以再套用回來）`)) return;
     state.sel.clear();
     state.pins = {};
+    state.dayCl = null;
     save(); renderGrid(); renderBar(); renderTools();
     toast('已清除全部勾選');
   }
@@ -1503,9 +1515,11 @@
       <span class="ver-hint">每次產生行程自動存一版（此裝置保留最近 10 版）；點版本即切換採用，行程與試算表同步都會用該版本。</span></div>`;
   }
 
+  let fullDayInfo = [];        // 整天對調用：[{ idx:第幾天, cluster:生活圈 }]
   function renderResult(plan) {
     const t = CONFIG.trip;
     const c = counts();
+    fullDayInfo = plan.days.map((d, i) => ({ idx: i, cluster: d.cluster })).filter((_, i) => plan.days[i].full);
     const dayHtml = plan.days.map((d, i) => {
       const cl = CLUSTERS[d.cluster];
       d._idx = i;
@@ -1524,7 +1538,7 @@
         }).join('')}</div>` : '';
       const dayTips = {
         d1: '🌕 ' + CONFIG.holidayNote,
-        d2: '🌕 9/27（日）為中秋連假隔天的週日，海雲台一帶人潮較多，膠囊列車與熱門餐廳請務必提前預約／提早抽號。'
+        d2: '🌕 9/27（日）為中秋連假隔天的週日，' + (CLUSTERS[d.cluster] || {}).short + '一帶人潮較多，熱門景點與餐廳請務必提前預約／提早抽號。'
       };
       const mc = d.modeCnt || { taxi: 0, metro: 0, walk: 0 };
       const modeBits = [];
@@ -1535,7 +1549,7 @@
       const transTip = d.seq && d.seq.length ? `<div class="tip${heavy ? ' holiday' : ''}">🧭 本日交通：${modeBits.join('＋') || '皆在步行圈'}｜<b>總移動約${durTxt(d.transMins || 0)}、${(d.transKm || 0).toFixed(1)}公里</b>｜交通費預估 ${money(d.transCost || 0)}（2人合計）${heavy && d.hog ? `——<b>其中「${esc(d.hog.name)}」最花時間</b>：把它移到別天（用下方項目的「調整」列）可省下約 ${durTxt(d.hog.save)} 車程、少繞 ${d.hog.km.toFixed(1)} 公里` : heavy ? '——移動偏多，可考慮把最遠的一站換成同區其他選擇' : ''}。${d.curfew ? `本日目標 ${fmtT(d.curfew)} 前回到飯店${d.farDay ? '（有遠程景點，已放寬）' : ''}。` : ''}時間為保守估算（含候車與緩衝）。</div>` : '';
       const squeezeTip = d.squeeze ? `<div class="tip holiday">⚠️ 離場前時間較緊：建議把部分採買或用餐提前，或改到機場解決。</div>` : '';
       const pinClosedTip = (d.pinnedClosed && d.pinnedClosed.length) ? `<div class="tip holiday">📌 你手動把 ${d.pinnedClosed.map(x => esc(x.name)).join('、')} 排在這天，但它<b>週${DOW_TXT[d.dow]}公休</b>——行程照你的安排保留，出發前請再確認。</div>` : '';
-      const closedTip = (d.closedShops && d.closedShops.length) ? `<div class="tip holiday">🚫 ${d.closedShops.map(g => esc(g.store.name)).join('、')}<b>本日（週${DOW_TXT[d.dow]}）公休</b>，這區沒有其他天可以排——${d.closedShops.map(g => g.items.map(i => esc(i.name)).join('、')).join('；')} 需要另外找地方買，或出發前先確認營業狀況。</div>` : '';
+      const closedTip = (d.closedShops && d.closedShops.length) ? `<div class="tip holiday">🚫 ${d.closedShops.map(g => esc(g.store.name)).join('、')}<b>本日（週${DOW_TXT[d.dow]}）公休</b>——${d.closedShops.map(g => g.items.map(i => esc(i.name)).join('、')).join('；')} 買不到。${d.full ? '可用右上角「🔄 換天」把這天和別天整個對調，避開公休日；' : ''}或另外找地方買，出發前先確認營業狀況。</div>` : '';
       const mealTip = (d.noLunch || d.noDinner) ? `<div class="tip holiday">🍽️ 這天${d.noLunch && d.noDinner ? '中午與晚上都' : d.noLunch ? '中午' : '晚上'}沒有安排用餐——${d.noLunch && !d.noDinner ? '上午的行程較滿，記得在景點附近先墊個東西' : '建議從下面的同區備選挑一家，或在附近隨機找一家'}。</div>` : '';
       const lunchTip = d.lunchDropped ? `<div class="tip">🍜 登機前時間有限，午餐建議外帶輕食或在機場用餐（金海機場餐飲選擇不少）。</div>` : '';
       return `
@@ -1543,6 +1557,8 @@
         <header class="day-head">
           <div class="day-no">Day ${i + 1}</div>
           <div><h2>${d.date}｜${esc(d.theme)}</h2><div class="day-cl">${esc(cl.label)}</div></div>
+          ${d.full ? `<div class="day-swap"><span>🔄 換天</span>${fullDayInfo.filter(f => f.idx !== i)
+            .map(f => `<button data-swap="${i}|${f.idx}" title="把這天的行程和 Day ${f.idx + 1} 整個對調">↔ Day ${f.idx + 1}<small>${esc(CLUSTERS[f.cluster].short)}</small></button>`).join('')}</div>` : ''}
         </header>
         ${dayTips[d.key] ? `<div class="tip holiday">${esc(dayTips[d.key])}</div>` : ''}
         <div class="tip">🚇 ${esc(TRANSIT[d.cluster])}</div>
@@ -1600,14 +1616,14 @@
             ${plan.shopCost ? `<div class="sub">🛍️ 購物清單全買約 ${money(plan.shopCost)}</div>` : ''}</div>
         </div>
         <div class="ov-wrap"><b>勾選總覽：</b>${overview}</div>
-        <div class="ov-wrap edit-hint no-print">✏️ <b>可以手動微調：</b>每個行程項目下方都有「調整」列——<b>◀ ▶</b> 把它搬到別天、<b>時段選單</b>改成當天的其他時段、<b>✕ 移除</b>拿掉不想去的。改完系統會立刻重排整份行程（交通、用餐時間、回飯店時間都會重新計算），手動指定的項目會標上 📌 並優先保留。</div>
+        <div class="ov-wrap edit-hint no-print">✏️ <b>可以手動微調：</b>整天想換日子的話，用 Day 2～4 標題右邊的 <b>🔄 換天</b>——例如按 Day 2 的「↔ Day 3」，兩天的行程就整個對調（同一天的項目一起搬，公休日與交通會重算）。單一項目則用它下方的「調整」列——<b>◀ ▶</b> 搬到別天、<b>時段選單</b>改成當天其他時段、<b>✕ 移除</b>拿掉不想去的。改完系統會立刻重排整份行程（交通、用餐時間、回飯店時間都會重新計算），手動指定的項目會標上 📌 並優先保留。</div>
         ${versionBarHtml()}
         <div class="r-actions no-print">
           <button id="copyText">📋 複製文字版行程</button>
           <button id="copyLink">🔗 複製行程連結分享</button>
           <button id="sheetBtn" class="gsbtn">📊 Google 試算表</button>
           <button id="printBtn">🖨️ 列印／存 PDF</button>
-          ${Object.keys(state.pins).length ? `<button id="resetPins" class="rst">↩️ 還原自動安排（已手動調整 ${Object.keys(state.pins).length} 項）</button>` : ''}
+          ${(Object.keys(state.pins).length || state.dayCl) ? `<button id="resetPins" class="rst">↩️ 還原自動安排（${[Object.keys(state.pins).length ? '已調整 ' + Object.keys(state.pins).length + ' 項' : '', state.dayCl ? '已換過天' : ''].filter(Boolean).join('、')}）</button>` : ''}
         </div>
       </header>
       ${dayHtml}
@@ -1940,8 +1956,9 @@
     if (!keepScroll) window.scrollTo({ top: 0 });
     try {
       const p = encPins();
+      const dc = state.dayCl ? '&dc=' + state.dayCl.join('.') : '';
       history.replaceState(null, '', location.pathname + '?s=' + [...state.sel].sort().join('.') +
-        (state.autoFill ? '' : '&af=0') + (p ? '&p=' + p : ''));
+        (state.autoFill ? '' : '&af=0') + (p ? '&p=' + p : '') + dc);
     } catch (e) {}
   }
   function showPick() {
@@ -1965,7 +1982,7 @@
      每次渲染都重綁會讓同一次點擊觸發 N 個處理器（呼叫次數指數成長） */
   function bindResultEvents() {
     $('#result-inner').addEventListener('click', e => {
-      if (e.target.closest('#resetPins')) { state.pins = {}; reflow('已還原成系統自動安排'); return; }
+      if (e.target.closest('#resetPins')) { state.pins = {}; state.dayCl = null; reflow('已還原成系統自動安排'); return; }
       const ad = e.target.closest('[data-add]');
       if (ad) {
         const [id, d] = ad.dataset.add.split('|');
@@ -1974,6 +1991,8 @@
         reflow(`已把「${DB[id].name}」加進 Day ${+d + 1} 的空檔，行程重新排好了`);
         return;
       }
+      const sw = e.target.closest('[data-swap]');
+      if (sw) { swapDays(...sw.dataset.swap.split('|').map(Number)); return; }
       const mv = e.target.closest('[data-mv]');
       const dp = e.target.closest('[data-drop]');
       if (mv) {
@@ -1998,6 +2017,21 @@
       state.pins[id] = { d: +d, s: sel.value, t: Date.now() };
       reflow(`已把「${DB[id].name}」改到「${SLOT_LABELS[sel.value] || sel.value}」時段`);
     });
+  }
+
+  /* 整天對調：交換兩天負責的生活圈，手動釘選的項目跟著整天一起搬 */
+  function swapDays(a, b) {
+    const pa = fullDayInfo.findIndex(f => f.idx === a);
+    const pb = fullDayInfo.findIndex(f => f.idx === b);
+    if (pa < 0 || pb < 0) return;
+    const arr = fullDayInfo.map(f => f.cluster);
+    const tmp = arr[pa]; arr[pa] = arr[pb]; arr[pb] = tmp;
+    state.dayCl = arr;
+    Object.keys(state.pins).forEach(id => {
+      const pin = state.pins[id];
+      if (pin.d === a) pin.d = b; else if (pin.d === b) pin.d = a;
+    });
+    reflow(`Day ${a + 1} 與 Day ${b + 1} 已整天對調（${CLUSTERS[arr[pa]].short} ↔ ${CLUSTERS[arr[pb]].short}），時間與交通都重新算過了`);
   }
 
   function bindEvents() {
