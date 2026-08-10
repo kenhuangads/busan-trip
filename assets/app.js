@@ -15,6 +15,10 @@
   const gmap = q => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
   const nmap = q => 'https://map.naver.com/p/search/' + encodeURIComponent(q);
   const gsearch = q => 'https://www.google.com/search?q=' + encodeURIComponent(q);
+  // CatchTable（캐치테이블）：帶關鍵字直接開到該店的搜尋結果，點進去就能訂位／線上候位
+  const ctable = q => 'https://app.catchtable.co.kr/ct/map/COMMON?showTabs=true&serviceType=INTEGRATION' +
+    '&keyword=' + encodeURIComponent(q) + '&keywordSearch=' + encodeURIComponent(q) + '&bottomSheetHeightType=HALF';
+  const tabling = q => 'https://www.tabling.co.kr/search?keyword=' + encodeURIComponent(q);
   const money = n => 'NT$' + Number(n).toLocaleString('en-US');
   const ceil5 = m => Math.ceil(m / 5) * 5;
   const fmtT = m => {
@@ -91,6 +95,8 @@
     if (links.zh) a.push(`<a href="${esc(links.zh)}" target="_blank" rel="noopener">🇹🇼 繁中介紹</a>`);
     if (links.o) a.push(`<a href="${esc(links.o)}" target="_blank" rel="noopener">🌐 官網／介紹</a>`);
     if (links.s) a.push(`<a href="${gsearch(links.s)}" target="_blank" rel="noopener">🔎 商品介紹</a>`);
+    if (links.ct) a.push(`<a class="bk" href="${ctable(links.ct)}" target="_blank" rel="noopener">🍽 CatchTable ${links.ctBook ? '訂位／候位' : '線上候位'}</a>`);
+    if (links.tb) a.push(`<a class="bk" href="${tabling(links.tb)}" target="_blank" rel="noopener">⏳ Tabling 候位</a>`);
     if (imgQuery) a.push(`<a href="${gimg(imgQuery)}" target="_blank" rel="noopener">📷 實景圖片</a>`);
     if (links.n) a.push(`<a href="${nmap(links.n)}" target="_blank" rel="noopener">🗺️ NAVER</a>`);
     return `<div class="links" onclick="event.stopPropagation()">${a.join('')}</div>`;
