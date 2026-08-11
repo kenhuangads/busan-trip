@@ -14,6 +14,17 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   const gmap = q => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
   const nmap = q => 'https://map.naver.com/p/search/' + encodeURIComponent(q);
+  /* NAVER 地圖「開啟 App 並跳到指定店家」——用官方 launchApp（inapp.map.naver.com/launchApp/*
+     已登錄 Universal Link／App Link）：iOS 走 navermaps:// scheme、Android 走 intent:// 帶
+     package=com.nhn.android.nmap，沒裝 App 時自動落回 fallbackUrl 的網頁版地圖。
+     有店家 id 就直達店家頁；沒有 id 的退而求其次開 App 的搜尋結果。 */
+  const APPNAME = 'kenhuangads.github.io';
+  const nlaunch = (target, params, fallback) =>
+    'https://inapp.map.naver.com/launchApp/' + target + '?' +
+    Object.entries(params).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&') +
+    '&appname=' + APPNAME + '&fallbackUrl=' + encodeURIComponent(fallback);
+  const nplace = id => nlaunch('place', { id }, 'https://map.naver.com/p/entry/place/' + id);
+  const nsearch = q => nlaunch('search', { query: q }, nmap(q));
   const gsearch = q => 'https://www.google.com/search?q=' + encodeURIComponent(q);
   // CatchTable（캐치테이블）：帶關鍵字直接開到該店的搜尋結果，點進去就能訂位／線上候位
   const ctable = q => 'https://app.catchtable.co.kr/ct/map/COMMON?showTabs=true&serviceType=INTEGRATION' +
@@ -98,7 +109,13 @@
     if (!links && !imgQuery) return '';
     links = links || {};
     const a = [];
-    if (links.tel) a.push(`<button type="button" class="telbtn" data-tel="${esc(links.tel)}" title="點一下複製電話——貼到 NAVER 地圖搜尋最快最準">📞 ${esc(links.tel)} <em>複製</em></button>`);
+    if (links.tel) {
+      // telSoft＝這支是 0507 代理號（안심번호），NAVER 搜尋會混進別家，只適合撥打
+      const soft = links.telSoft;
+      a.push(`<button type="button" class="telbtn${soft ? ' soft' : ''}" data-tel="${esc(links.tel)}" title="${soft
+        ? '這是店家的代理號碼（0507 안심번호），可以直接撥打；但拿去 NAVER 搜尋會跳出別家，找店請按旁邊的「NAVER・App直達」'
+        : '點一下複製電話——貼到 NAVER 地圖搜尋，一貼就只跳出這一家'}">📞 ${esc(links.tel)} <em>${soft ? '撥打用' : '複製'}</em></button>`);
+    }
     if (links.g) a.push(`<a href="${gmap(links.g)}" target="_blank" rel="noopener">📍 Google地圖</a>`);
     if (links.zh) a.push(`<a href="${esc(links.zh)}" target="_blank" rel="noopener">🇹🇼 繁中介紹</a>`);
     if (links.o) a.push(`<a href="${esc(links.o)}" target="_blank" rel="noopener">🌐 官網／介紹</a>`);
@@ -107,7 +124,9 @@
     else if (links.ct) a.push(`<a class="bk" href="${ctable(links.ct)}" target="_blank" rel="noopener">🍽 CatchTable ${links.ctBook ? '訂位／候位' : '線上候位'}</a>`);
     if (links.tb) a.push(`<a class="bk" href="${tabling(links.tb)}" target="_blank" rel="noopener">⏳ Tabling 候位</a>`);
     if (imgQuery) a.push(`<a href="${gimg(imgQuery)}" target="_blank" rel="noopener">📷 實景圖片</a>`);
-    if (links.n) a.push(`<a href="${nmap(links.n)}" target="_blank" rel="noopener">🗺️ NAVER</a>`);
+    // 有 NAVER 店家 id → 手機點了直接開 App 到「那一家」的頁面（沒裝 App 則開網頁版）
+    if (links.nid) a.push(`<a class="nv" href="${nplace(links.nid)}" target="_blank" rel="noopener">🗺️ NAVER・App直達</a>`);
+    else if (links.n) a.push(`<a class="nv" href="${nsearch(links.n)}" target="_blank" rel="noopener">🗺️ NAVER</a>`);
     return `<div class="links" onclick="event.stopPropagation()">${a.join('')}</div>`;
   }
   // 圖片搜尋關鍵字：優先用「對準清單品項」的精準韓文商品名，其次店名
@@ -1775,7 +1794,8 @@
       ${dayHtml}
       ${shopHtml}
       <footer class="r-foot">
-        <div class="tip">📞 <b>用電話找店最準：</b>餐飲項目的綠色電話鈕點一下就複製，貼進 <b>NAVER 地圖</b>搜尋框——韓國店名常有多家分店同名，用電話一貼就只跳出正確的那一家（實測 82 家逐支反查過）。少數店家沒在 NAVER 登記電話（Hash Table、HELMET、THE BARN BERLIN、豚笑廣安店、BIFF 昇基堅果黑糖餅、樂天光復店的尚國家、Blue Bottle）就只放地圖連結，不放查不到的號碼。</div>
+        <div class="tip">🗺️ <b>找店最快的方式：</b>按藍色的 <b>「NAVER・App直達」</b>——手機裝了 NAVER 地圖 App 會<b>直接跳到那一家的店家頁</b>（不用搜尋、不會跑錯分店），沒裝 App 就開網頁版地圖。美食 88 家、景點 10 處、購物門市 19 間都已逐一核對過店家頁面。</div>
+        <div class="tip">📞 <b>電話按鈕：</b>點一下複製。綠色的貼進 NAVER 搜尋框一貼就中；<b>灰色標「撥打用」的是店家的 0507 代理號碼（안심번호）</b>，這種號碼會被多家業者共用，搜尋會跳出別家（例如味贊王鹽烤肉西面店），只適合直接撥打——要找店請按「NAVER・App直達」。少數店家沒在 NAVER 登記電話就不放號碼，不放查不到的東西。</div>
         <div class="tip">📱 <b>排隊神器：</b>標「App直達」的 CatchTable 鈕會直接開到<b>那間店的頁面</b>——手機裝了 <b>CatchTable Global</b>（外國人版，Google/Apple 帳號即可註冊、免韓國門號）點連結就自動跳進 App，線上訂位或遠端抽號一氣呵成；沒裝 App 則開繁中網頁版，一樣能操作。現場機台可輸入 Email 登記並拍下 QR Code 留存。</div>
         <div class="tip">💡 ${esc(CONFIG.rateNote)}</div>
         <div class="tip buildtip">🔄 版本 ${esc(CONFIG.build || '-')}｜手機若看不到新功能（例如每個項目下方的「調整」列），代表載到快取的舊版：下拉重新整理，或關掉分頁重開即可。</div>
