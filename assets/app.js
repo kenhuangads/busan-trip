@@ -18,6 +18,10 @@
   // CatchTable（캐치테이블）：帶關鍵字直接開到該店的搜尋結果，點進去就能訂位／線上候位
   const ctable = q => 'https://app.catchtable.co.kr/ct/map/COMMON?showTabs=true&serviceType=INTEGRATION' +
     '&keyword=' + encodeURIComponent(q) + '&keywordSearch=' + encodeURIComponent(q) + '&bottomSheetHeightType=HALF';
+  // 有店家專頁代號（ctS）就直連 CatchTable Global 的繁中店家頁：
+  // catchtable.net 全站設了 Universal/App Link，手機裝了 CatchTable Global App
+  // 點連結會自動開 App 到該店頁面；沒裝則開繁中網頁版（Google/Apple 帳號可訂位，免韓國門號）
+  const ctShop = s => 'https://www.catchtable.net/zh-TW/shop/' + s;
   const tabling = q => 'https://www.tabling.co.kr/search?keyword=' + encodeURIComponent(q);
   const money = n => 'NT$' + Number(n).toLocaleString('en-US');
   const ceil5 = m => Math.ceil(m / 5) * 5;
@@ -83,6 +87,8 @@
     fromShare: false,
     draftOpen: false,
     pins: {},               // 手動調整：{ 項目id: { d:第幾天(0-4), s:時段key或null } }
+    stPins: {},             // 購物門市手動指定：{ 門市key: { d:第幾天(0-4) } }
+    ord: {},                // 當日手動排序：{ 第幾天: [停靠點key…] }（key＝項目id／st:門市／d5shop／anchor）
     dayCl: null             // 整天對調：Day2-4 各自負責的生活圈，null＝系統自動安排
   };
 
@@ -95,7 +101,8 @@
     if (links.zh) a.push(`<a href="${esc(links.zh)}" target="_blank" rel="noopener">🇹🇼 繁中介紹</a>`);
     if (links.o) a.push(`<a href="${esc(links.o)}" target="_blank" rel="noopener">🌐 官網／介紹</a>`);
     if (links.s) a.push(`<a href="${gsearch(links.s)}" target="_blank" rel="noopener">🔎 商品介紹</a>`);
-    if (links.ct) a.push(`<a class="bk" href="${ctable(links.ct)}" target="_blank" rel="noopener">🍽 CatchTable ${links.ctBook ? '訂位／候位' : '線上候位'}</a>`);
+    if (links.ctS) a.push(`<a class="bk" href="${ctShop(links.ctS)}" target="_blank" rel="noopener">🍽 CatchTable ${links.ctBook ? '訂位／候位' : '線上候位'}・App直達</a>`);
+    else if (links.ct) a.push(`<a class="bk" href="${ctable(links.ct)}" target="_blank" rel="noopener">🍽 CatchTable ${links.ctBook ? '訂位／候位' : '線上候位'}</a>`);
     if (links.tb) a.push(`<a class="bk" href="${tabling(links.tb)}" target="_blank" rel="noopener">⏳ Tabling 候位</a>`);
     if (imgQuery) a.push(`<a href="${gimg(imgQuery)}" target="_blank" rel="noopener">📷 實景圖片</a>`);
     if (links.n) a.push(`<a href="${nmap(links.n)}" target="_blank" rel="noopener">🗺️ NAVER</a>`);
@@ -126,6 +133,8 @@
       localStorage.setItem('busan_sel_v2', JSON.stringify([...state.sel]));
       localStorage.setItem('busan_af_v2', state.autoFill ? '1' : '0');
       localStorage.setItem('busan_pins_v1', JSON.stringify(state.pins));
+      localStorage.setItem('busan_stpin_v1', JSON.stringify(state.stPins));
+      localStorage.setItem('busan_ord_v1', JSON.stringify(state.ord));
       localStorage.setItem('busan_daycl_v1', JSON.stringify(state.dayCl));
     } catch (e) {}
   }
@@ -135,17 +144,28 @@
       s.forEach(id => { if (DB[id]) state.sel.add(id); });
       state.autoFill = localStorage.getItem('busan_af_v2') !== '0';
       try { state.pins = JSON.parse(localStorage.getItem('busan_pins_v1') || '{}') || {}; } catch (e) { state.pins = {}; }
+      try { state.stPins = JSON.parse(localStorage.getItem('busan_stpin_v1') || '{}') || {}; } catch (e) { state.stPins = {}; }
+      try { state.ord = JSON.parse(localStorage.getItem('busan_ord_v1') || '{}') || {}; } catch (e) { state.ord = {}; }
       try { state.dayCl = JSON.parse(localStorage.getItem('busan_daycl_v1') || 'null'); } catch (e) { state.dayCl = null; }
     } catch (e) {}
   }
   const encPins = () => Object.entries(state.pins)
     .filter(([id]) => state.sel.has(id))
     .map(([id, v]) => id + '-' + v.d + (v.s ? '-' + v.s : '')).join('.');
+  const encStPins = () => Object.entries(state.stPins)
+    .filter(([k]) => STORES[k])
+    .map(([k, v]) => k + '-' + v.d).join('.');
+  const encOrd = () => Object.entries(state.ord)
+    .filter(([, keys]) => keys && keys.length)
+    .map(([d, keys]) => d + '.' + keys.join('.')).join('~');
+  const extraParams = () => {
+    const p = encPins(), sp = encStPins(), o = encOrd();
+    const dc = state.dayCl ? '&dc=' + state.dayCl.join('.') : '';
+    return (p ? '&p=' + p : '') + (sp ? '&sp=' + sp : '') + (o ? '&o=' + encodeURIComponent(o) : '') + dc;
+  };
   function shareUrl() {
     const ids = [...state.sel].sort();
-    const p = encPins();
-    const dc = state.dayCl ? '&dc=' + state.dayCl.join('.') : '';
-    return CONFIG.baseUrl + '?s=' + ids.join('.') + (state.autoFill ? '' : '&af=0') + (p ? '&p=' + p : '') + dc;
+    return CONFIG.baseUrl + '?s=' + ids.join('.') + (state.autoFill ? '' : '&af=0') + extraParams();
   }
   function parseUrl() {
     const p = new URLSearchParams(location.search);
@@ -160,6 +180,21 @@
     if (pin) pin.split('.').forEach((t, i) => {
       const a = t.split('-');
       if (a[0] && DB[a[0]] && a[1] != null) state.pins[a[0]] = { d: +a[1], s: a[2] || null, t: i };
+    });
+    const sp = p.get('sp');
+    state.stPins = {};
+    if (sp) sp.split('.').forEach(t => {
+      const i = t.lastIndexOf('-');
+      if (i <= 0) return;
+      const k = t.slice(0, i), d = +t.slice(i + 1);
+      if (STORES[k] && d >= 0 && d <= 4) state.stPins[k] = { d };
+    });
+    const o = p.get('o');
+    state.ord = {};
+    if (o) o.split('~').forEach(seg => {
+      const a = seg.split('.');
+      const d = +a[0];
+      if (d >= 0 && d <= 4 && a.length > 1) state.ord[d] = a.slice(1);
     });
     const dc = p.get('dc');
     state.dayCl = (dc && dc.split('.').length === 3 && dc.split('.').every(c => CLUSTERS[c])) ? dc.split('.') : null;
@@ -387,6 +422,12 @@
   /* ---- 停靠點（seq）輔助 ---- */
   const storeStay = g => Math.min(100, g.store.stay + Math.max(0, g.items.length - 3) * 4);
 
+  /* 停靠點的穩定識別鍵：手動排序（state.ord）靠它跨次重排都對得起來 */
+  const stopKey = st => st.type === 'store' ? 'st:' + st.storeId
+    : st.type === 'd5shop' ? 'd5shop'
+    : (st.cell && st.cell.anchor) ? 'anchor'
+    : (st.cell && st.cell.item) ? st.cell.item.id : null;
+
   function posOfStop(stop, day) {
     if (stop.type === 'store') return { lat: stop.store.lat, lng: stop.store.lng, zone: stop.store.zone };
     if (stop.type === 'd5shop') {
@@ -414,6 +455,32 @@
   function optimizeDayRoute(day) {
     const seq = day.seq;
     if (!seq || seq.length < 2) return;
+
+    /* 使用者手動排過這天的順序 → 完全照使用者的先後，只重算時間與交通；
+       之後才加進來的新停靠點（換天搬來的、空檔加點的）就自動找繞路最少的位置插入 */
+    const ordK = state.ord[day._i];
+    if (ordK && ordK.length) {
+      day.manualOrd = true;
+      const CFm = CONFIG.curfew || { normal: 1290, far: 1320, farKm: 12 };
+      day.curfewLimit = seq.some(st => havKm(HOTEL, posOfStop(st, day)) >= CFm.farKm) ? CFm.far : CFm.normal;
+      const ix = {};
+      ordK.forEach((k, i) => { if (ix[k] == null) ix[k] = i + 1; });
+      const listed = seq.filter(st => ix[stopKey(st)]);
+      const extra = seq.filter(st => !ix[stopKey(st)]);
+      listed.sort((a, b) => ix[stopKey(a)] - ix[stopKey(b)]);
+      day.seq = listed;
+      extra.forEach(st => {
+        if (insertFlexible(day, st)) return;
+        if (st.type === 'cell' && st.cell) {
+          if (st.cell.item && !st.cell.suggest) day.backup.push(st.cell.item);
+          if (st.slotKey) day.slots[st.slotKey] = null;
+          (day.trimmed = day.trimmed || []).push(st);
+          day.overflow = true;
+        } else day.seq.push(st);
+      });
+      return;
+    }
+
     if (day.key === 'd5') return; // 返程日全在西面步行圈，維持「早餐→採購→午餐」的時段順序
     const P = st => posOfStop(st, day);
     const isFlex = st => st.type === 'store' || (st.type === 'cell' && st.cell && st.cell.anchor);
@@ -515,10 +582,13 @@
       const hotelRow = day.tl.filter(r => r.k === 'hotel').pop();
       const back = hotelRow ? hotelRow.t : null;
       if (back == null || back <= limit || !day.seq.length) break;
+      // 手動排序的天：使用者的順序說了算，超時只提醒、不擅自刪停靠點
+      if (day.manualOrd) { day.curfewSoft = true; break; }
 
       // 移除優先序：散步錨點 → 自動補位 → 順路採購 → 自己勾的項目 → 最後採購（最後才動）
       const rank = st => {
         if (st.type === 'cell' && st.cell && st.cell.pinned) return 6; // 手動指定的最後才動
+        if (st.type === 'store' && st.pinnedStore) return 6;           // 手動指定日期的採購站同樣受保護
         if (st.type === 'd5shop') return 5;
         if (isMealStop(st)) return 4;   // 正餐（含自動補位的）最後才動
         if (st.type === 'cell' && st.cell && st.cell.anchor) return 0;
@@ -574,7 +644,7 @@
     let lastGap = MEAL_GAP;                    // 上一頓要求的間隔（輕食減半）
     const modeCnt = { walk: 0, taxi: 0, metro: 0 };
 
-    day.seq.forEach(stop => {
+    day.seq.forEach((stop, si) => {
       const pos = posOfStop(stop, day);
       const tr = transCalc(cur, pos);
       const tKey = stop.slotKey || (stop.type === 'd5shop' ? 'd5shop' : null);
@@ -605,9 +675,9 @@
       }
       const stay = stayOfStop(stop, day);
       const end = start + stay;
-      if (stop.type === 'store') rows.push({ k: 'store', t: start, end, stay, g: stop });
-      else if (stop.type === 'd5shop') rows.push({ k: 'd5shop', t: start, end, stay, stores: stop.stores, warn: stop.warn });
-      else rows.push({ k: 'item', t: start, end, stay, slotKey: stop.slotKey, cell: stop.cell });
+      if (stop.type === 'store') rows.push({ k: 'store', t: start, end, stay, g: stop, si });
+      else if (stop.type === 'd5shop') rows.push({ k: 'd5shop', t: start, end, stay, stores: stop.stores, warn: stop.warn, si });
+      else rows.push({ k: 'item', t: start, end, stay, slotKey: stop.slotKey, cell: stop.cell, si });
       time = end;
       cur = pos;
     });
@@ -643,6 +713,7 @@
     const shops = sel.filter(i => i.kind === 'shop');
 
     const days = makeDays();
+    days.forEach((d, i) => { d._i = i; });
 
     /* 依勾選數量重新分配 Day2-4 的主題區域 */
     const cnt = { east: 0, gwangalli: 0, nampo: 0 };
@@ -803,8 +874,17 @@
     });
     const storeGroups = Object.values(byStore);
     const cvsGroup = storeGroups.find(g => g.storeId === 'cvs');
-    const smGroups = storeGroups.filter(g => g !== cvsGroup && ZONES[g.store.zone].cluster === 'seomyeon');
-    const otherGroups = storeGroups.filter(g => g !== cvsGroup && !smGroups.includes(g));
+    /* 門市手動指定日期：使用者說了算。指定 Day1-4 者從自動分配抽出；
+       指定 Day5 的西面店回到最終採購合併站、非西面店則單獨排進 Day5 */
+    const stPinOf = g => {
+      const p = state.stPins[g.storeId];
+      return (p && p.d >= 0 && p.d <= 4) ? p.d : null;
+    };
+    const pinnedEarly = storeGroups.filter(g => g !== cvsGroup && stPinOf(g) != null && stPinOf(g) < 4);
+    const smGroups = storeGroups.filter(g => g !== cvsGroup && !pinnedEarly.includes(g) && ZONES[g.store.zone].cluster === 'seomyeon');
+    const otherGroups = storeGroups.filter(g => g !== cvsGroup && !pinnedEarly.includes(g) && !smGroups.includes(g));
+    const pinnedD5Other = otherGroups.filter(g => stPinOf(g) === 4);
+    const autoOther = otherGroups.filter(g => stPinOf(g) == null);
 
     /* 每日停靠序列（不含 d5shop 佔位，稍後客製） */
     days.forEach(d => {
@@ -814,7 +894,7 @@
     });
 
     /* 非西面門市 → 掛到對應區域日（實際落點交給下方的路線最佳化決定） */
-    otherGroups
+    autoOther
       .sort((a, b) => b.items.length - a.items.length)
       .forEach(g => {
         const cl = ZONES[g.store.zone].cluster;
@@ -828,9 +908,17 @@
 
     /* 晚開門的西面選品店（NOCLAIM 12:00、ADER 13:00 等 11:00 後才開的店）
        改排 Day 1 下午～傍晚，不塞進 Day 5 上午的最終採購（會撲空） */
-    const lateSm = smGroups.filter(g => (g.store.open || 0) >= 660);
+    const lateSm = smGroups.filter(g => (g.store.open || 0) >= 660 && stPinOf(g) !== 4);
     const d5Sm = smGroups.filter(g => !lateSm.includes(g));
     lateSm.forEach(g => days[0].seq.push(g));
+
+    /* 手動指定 Day1-4 的門市 → 直接排進那天（位置交給路線最佳化；公休照排但明白提醒） */
+    pinnedEarly.forEach(g => {
+      const day = days[stPinOf(g)];
+      g.pinnedStore = true;
+      day.seq.push(g);
+      if (!openOnDay(g.store, day)) day.pinnedClosed = (day.pinnedClosed || []).concat({ name: g.store.name });
+    });
 
     /* Day 5：西面最終採購（客製列出門市與品項） */
     const d5 = days[4];
@@ -849,6 +937,8 @@
       if (k === 'd5shop') d5.seq.push(d5stop);
       else if (d5.slots[k]) d5.seq.push({ type: 'cell', slotKey: k, cell: d5.slots[k] });
     });
+    /* 手動指定 Day5 的非西面門市 → 單獨排進返程日（時間吃緊會照常提醒） */
+    pinnedD5Other.forEach(g => { g.pinnedStore = true; d5.seq.push(g); });
 
     /* 路線最佳化：同時段內依地理位置重排，彈性停靠點插到繞路最少處 */
     days.forEach(optimizeDayRoute);
@@ -999,11 +1089,11 @@
       let hint;
       if (g.storeId === 'cvs') hint = '隨時順手買｜' + g.store.name;
       else if (g.closedDay) hint = `⚠️ 這趟排不到（該店在對應行程日公休）｜${g.store.name}`;
-      else if (di >= 0) hint = `Day ${di + 1} 順路採買｜${g.store.name}`;
+      else if (di >= 0) hint = `Day ${di + 1} ${g.pinnedStore ? '手動指定採買' : '順路採買'}｜${g.store.name}`;
       else if (cl === 'seomyeon' && (g.store.open || 0) >= 660) hint = 'Day 1 下午順路採買（該店中午後才開門）｜' + g.store.name;
       else if (cl === 'seomyeon') hint = 'Day 5 上午集中採買（可提前 Day 1 傍晚）｜' + g.store.name;
       else hint = `⚠️ 時間排不進行程，想買要自行安排｜${g.store.name}`;
-      shopGroups[hint] = { store: g.store, items: g.items };
+      shopGroups[hint] = { store: g.store, storeId: g.storeId, pinned: !!g.pinnedStore, items: g.items };
     });
 
     /* 費用估算 */
@@ -1324,10 +1414,11 @@
       const earlyWarn = g.store.open != null && r.t < g.store.open
         ? `<div class="store-note">⚠️ 該店 ${fmtT(g.store.open)} 才開門，請留意抵達時間或往後挪。</div>` : '';
       return entryHtml(fmtT(r.t), '順路採購', `
-        <div class="e-name">🛍️ ${esc(g.store.name)} <span class="stay">⏳ 停留約${durTxt(r.stay)}</span></div>${earlyWarn}
+        <div class="e-name">🛍️ ${esc(g.store.name)} ${g.pinnedStore ? '<span class="badge pin">📌 手動指定</span>' : ''}<span class="stay">⏳ 停留約${durTxt(r.stay)}</span></div>${earlyWarn}
         <div class="store-items">${g.items.map(it => `<span>☐ ${esc(it.name)}</span>`).join('')}</div>
         ${g.store.note ? `<div class="store-note">💡 ${esc(g.store.note)}</div>` : ''}${lateWarn}
-        ${linkRow(g.store.links, g.store.links && g.store.links.g)}`, 'storestop');
+        ${linkRow(g.store.links, g.store.links && g.store.links.g)}
+        ${storeBar(g, day, r.si)}`, 'storestop');
     }
     if (r.k === 'd5shop') {
       if (!r.stores) {
@@ -1340,11 +1431,16 @@
         <div class="store-b"><b>🛍️ ${esc(g.store.name)}</b>
           <div class="store-items">${g.items.map(it => `<span>☐ ${esc(it.name)}</span>`).join('')}</div>
           ${g.store.note ? `<div class="store-note">💡 ${esc(g.store.note)}</div>` : ''}
-          ${linkRow(g.store.links, g.store.links && g.store.links.g)}</div>`).join('');
+          ${linkRow(g.store.links, g.store.links && g.store.links.g)}
+          <div class="e-edit no-print"><span class="ed-lab">這間店</span><select class="ed-sel" data-stday="${g.storeId}">
+            <option value="4" selected>留在 Day 5 最終採購</option>
+            ${[0, 1, 2, 3].map(i => `<option value="${i}">提前到 Day ${i + 1} 買</option>`).join('')}
+          </select></div></div>`).join('');
       return entryHtml(fmtT(r.t), SLOT_LABELS.d5shop, `
         <div class="e-name">🛒 西面最終採購（${r.stores.reduce((s, g) => s + g.items.length, 0)} 項）<span class="stay">⏳ 合計約${durTxt(r.stay)}</span></div>
         ${inner}
-        <div class="store-note">💳 記得帶護照辦退稅；買完回飯店領行李。${r.warn ? '<b>⚠️ 品項較多、離場前時間較緊，建議部分改到 Day 1 傍晚先買。</b>' : ''}</div>`, 'storestop');
+        <div class="store-note">💳 記得帶護照辦退稅；買完回飯店領行李。${r.warn ? '<b>⚠️ 品項較多、離場前時間較緊，建議部分改到 Day 1 傍晚先買（用各店的下拉選單即可）。</b>' : ''}</div>
+        <div class="e-edit no-print"><span class="ed-lab">調整</span>${moveBtns(day, r.si)}</div>`, 'storestop');
     }
     /* item */
     const cell = r.cell;
@@ -1353,7 +1449,8 @@
       const a = cell.anchor;
       return entryHtml(fmtT(r.t), label, `
         <div class="e-name">${a.shopping ? '🛍️' : '🚶'} ${esc(a.name)} <span class="badge free">${a.shopping ? '採購時間' : '免費散步'}</span> <span class="stay">⏳ 約${durTxt(r.stay)}</span></div>
-        <div class="e-desc">${esc(a.desc)}</div>${linkRow(a.links, a.links && a.links.g)}`);
+        <div class="e-desc">${esc(a.desc)}</div>${linkRow(a.links, a.links && a.links.g)}
+        <div class="e-edit no-print"><span class="ed-lab">調整</span>${moveBtns(day, r.si)}</div>`);
     }
     const it = cell.item;
     const ci = catInfo(it);
@@ -1368,21 +1465,44 @@
       ${siblings(it).length ? `<div class="e-meta sub">🏪 走不到也沒關係：${siblings(it).map(s => esc(s.area)).join('、')}也有分店</div>` : ''}
       ${it.close != null && r.end > it.close ? `<div class="e-meta warnline">⚠️ 這家約 ${fmtT(it.close)} 打烊，此時段可能來不及——建議提前或改選同品牌其他分店</div>` : ''}
       <div class="e-desc">${esc(it.desc)}</div>${linkRow(it.links, imgQ(it))}
-      ${editBar(it, day, r.slotKey, cell)}`);
+      ${editBar(it, day, r.slotKey, cell, r.si)}`);
   }
 
-  /* 手動調整列：搬到別天／改時段／移除，改完會自動重排整份行程 */
-  function editBar(it, day, slotKey, cell) {
+  /* 本日內前後移（▲▼）：換完只重算時間，順序完全照使用者的 */
+  function moveBtns(day, si) {
+    if (!day || si == null) return '';
+    const di = day._idx, n = (day.seq || []).length;
+    return `<button class="ed" data-ro="${di}|${si}|-1"${si <= 0 ? ' disabled' : ''} title="和本日上一站對調">▲ 提早</button>
+      <button class="ed" data-ro="${di}|${si}|1"${si >= n - 1 ? ' disabled' : ''} title="和本日下一站對調">▼ 延後</button>`;
+  }
+
+  /* 手動調整列：本日排序／搬到別天／改時段／移除，改完會自動重排整份行程 */
+  function editBar(it, day, slotKey, cell, si) {
     if (!day || cell.suggest) return '';
     const di = day._idx;
     const opts = (day.slotKeys || []).filter(k => k !== 'd5shop').map(k =>
       `<option value="${k}"${k === slotKey ? ' selected' : ''}>${SLOT_LABELS[k] || k}</option>`).join('');
     return `<div class="e-edit no-print">
       <span class="ed-lab">調整</span>
+      ${moveBtns(day, si)}
       <button class="ed" data-mv="${it.id}|${di - 1}"${di <= 0 ? ' disabled' : ''} title="移到前一天">◀ ${di > 0 ? 'Day' + di : '前一天'}</button>
       <button class="ed" data-mv="${it.id}|${di + 1}"${di >= 4 ? ' disabled' : ''} title="移到後一天">${di < 4 ? 'Day' + (di + 2) : '後一天'} ▶</button>
       <select class="ed-sel" data-slot="${it.id}|${di}">${opts}</select>
       <button class="ed del" data-drop="${it.id}" title="從行程移除">✕ 移除</button>
+    </div>`;
+  }
+
+  /* 採購站的調整列：本日排序＋搬到別天＋改回自動（比照景點美食的操作習慣） */
+  function storeBar(g, day, si) {
+    if (!day || g.storeId === 'cvs') return '';
+    const di = day._idx;
+    const pinned = state.stPins[g.storeId];
+    return `<div class="e-edit no-print">
+      <span class="ed-lab">調整</span>
+      ${moveBtns(day, si)}
+      <button class="ed" data-stmv="${g.storeId}|${di - 1}"${di <= 0 ? ' disabled' : ''} title="這站採購移到前一天">◀ ${di > 0 ? 'Day' + di : '前一天'}</button>
+      <button class="ed" data-stmv="${g.storeId}|${di + 1}"${di >= 4 ? ' disabled' : ''} title="這站採購移到後一天">${di < 4 ? 'Day' + (di + 2) : '後一天'} ▶</button>
+      ${pinned ? `<button class="ed" data-stauto="${g.storeId}" title="取消手動指定，交回系統自動安排">↩ 自動</button>` : ''}
     </div>`;
   }
 
@@ -1528,6 +1648,7 @@
       <span class="ver-hint">每次產生行程自動存一版（此裝置保留最近 10 版）；點版本即切換採用，行程與試算表同步都會用該版本。</span></div>`;
   }
 
+  let lastPlan = null;         // 最近一次產生的行程（▲▼ 排序要讀當天的實際停靠序列）
   let fullDayInfo = [];        // 整天對調用：[{ idx:第幾天, cluster:生活圈 }]
   function renderResult(plan) {
     const t = CONFIG.trip;
@@ -1601,7 +1722,14 @@
         <p class="hint">💡 已依「實際門市」分組並排進每日行程。<b>退稅：</b>門檻已降到同店單筆滿 15,000₩，樂天／新世界百貨多數專櫃出示護照可直接用「現場免稅價」結帳（大同、READY YOUNG 等事後免稅藥局也支援）；拿到退稅單也不必等機場排隊——樂天百貨 1 樓有自動退稅機，刷護照與退稅單當場吐韓元現金。注意：現場即時退稅單筆限 100 萬₩、全程累計 500 萬₩；單筆退稅額超過 7.5 萬₩（約單筆消費 100 萬₩，例如精品包）須帶未拆封商品先到機場海關查驗蓋章、之後才能託運。</p>
         ${groups.map(g => {
           const grp = plan.shopGroups[g];
-          return `<div class="shop-group"><h3>📍 ${esc(g)}</h3>${grp.items.map(it => {
+          const pin = grp.storeId ? state.stPins[grp.storeId] : null;
+          const dayPick = (grp.storeId && grp.storeId !== 'cvs')
+            ? `<div class="e-edit no-print"><span class="ed-lab">這間店安排到</span><select class="ed-sel" data-stday="${grp.storeId}">
+                 <option value=""${!pin ? ' selected' : ''}>系統自動安排</option>
+                 ${[0, 1, 2, 3, 4].map(i => `<option value="${i}"${pin && pin.d === i ? ' selected' : ''}>📌 Day ${i + 1}${i === 4 ? '（返程上午）' : ''}</option>`).join('')}
+               </select></div>`
+            : '';
+          return `<div class="shop-group"><h3>📍 ${esc(g)}</h3>${dayPick}${grp.items.map(it => {
             const ci = catInfo(it);
             const safeTxt = it.safe === 'warn' ? '<span class="badge warn">⚠️ 成分含肉禁帶</span>' :
               it.safe === 'ok-check' ? '<span class="badge note">須託運</span>' : '';
@@ -1629,20 +1757,23 @@
             ${plan.shopCost ? `<div class="sub">🛍️ 購物清單全買約 ${money(plan.shopCost)}</div>` : ''}</div>
         </div>
         <div class="ov-wrap"><b>勾選總覽：</b>${overview}</div>
-        <div class="ov-wrap edit-hint no-print">✏️ <b>可以手動微調：</b>整天想換日子的話，用 Day 2～4 標題右邊的 <b>🔄 換天</b>——例如按 Day 2 的「↔ Day 3」，兩天的行程就整個對調（同一天的項目一起搬，公休日與交通會重算）。單一項目則用它下方的「調整」列——<b>◀ ▶</b> 搬到別天、<b>時段選單</b>改成當天其他時段、<b>✕ 移除</b>拿掉不想去的。改完系統會立刻重排整份行程（交通、用餐時間、回飯店時間都會重新計算），手動指定的項目會標上 📌 並優先保留。</div>
+        <div class="ov-wrap edit-hint no-print">✏️ <b>可以手動微調：</b>整天想換日子的話，用 Day 2～4 標題右邊的 <b>🔄 換天</b>——例如按 Day 2 的「↔ Day 3」，兩天的行程就整個對調（同一天的項目一起搬，公休日與交通會重算）。每個停靠點（景點、美食、<b>採購站也一樣</b>）下方都有「調整」列——<b>▲ ▼</b> 直接改當天的先後順序（改完出發抵達時間全部重新試算）、<b>◀ ▶</b> 搬到別天、<b>時段選單</b>改成當天其他時段、<b>✕ 移除</b>拿掉不想去的；Day 5 最終採購裡的每間店還能用下拉選單提前到別天買。改完系統會立刻重排整份行程（交通、用餐時間、回飯店時間都會重新計算），手動指定的會標上 📌 並優先保留、手動排的順序不會被系統推翻。</div>
         ${versionBarHtml()}
         <div class="r-actions no-print">
           <button id="copyText">📋 複製文字版行程</button>
           <button id="copyLink">🔗 複製行程連結分享</button>
           <button id="sheetBtn" class="gsbtn">📊 Google 試算表</button>
           <button id="printBtn">🖨️ 列印／存 PDF</button>
-          ${(Object.keys(state.pins).length || state.dayCl) ? `<button id="resetPins" class="rst">↩️ 還原自動安排（${[Object.keys(state.pins).length ? '已調整 ' + Object.keys(state.pins).length + ' 項' : '', state.dayCl ? '已換過天' : ''].filter(Boolean).join('、')}）</button>` : ''}
+          ${(Object.keys(state.pins).length || Object.keys(state.stPins).length || Object.keys(state.ord).length || state.dayCl) ? `<button id="resetPins" class="rst">↩️ 還原自動安排（${[
+            (Object.keys(state.pins).length + Object.keys(state.stPins).length) ? '已調整 ' + (Object.keys(state.pins).length + Object.keys(state.stPins).length) + ' 項' : '',
+            Object.keys(state.ord).length ? '已改 ' + Object.keys(state.ord).length + ' 天順序' : '',
+            state.dayCl ? '已換過天' : ''].filter(Boolean).join('、')}）</button>` : ''}
         </div>
       </header>
       ${dayHtml}
       ${shopHtml}
       <footer class="r-foot">
-        <div class="tip">📱 <b>排隊神器：</b>多數名店可用 CatchTable（有外國人版 CatchTable Global App）遠端抽號；現場機台可輸入 Email 登記並拍下 QR Code 留存。</div>
+        <div class="tip">📱 <b>排隊神器：</b>標「App直達」的 CatchTable 鈕會直接開到<b>那間店的頁面</b>——手機裝了 <b>CatchTable Global</b>（外國人版，Google/Apple 帳號即可註冊、免韓國門號）點連結就自動跳進 App，線上訂位或遠端抽號一氣呵成；沒裝 App 則開繁中網頁版，一樣能操作。現場機台可輸入 Email 登記並拍下 QR Code 留存。</div>
         <div class="tip">💡 ${esc(CONFIG.rateNote)}</div>
         <div class="tip buildtip">🔄 版本 ${esc(CONFIG.build || '-')}｜手機若看不到新功能（例如每個項目下方的「調整」列），代表載到快取的舊版：下拉重新整理，或關掉分頁重開即可。</div>
         <div class="tip">🎫 天空膠囊列車、遊艇、X the SKY 建議出發前 2 週完成線上預約；Spa Land 可先在 Klook/NOL 買優惠票。</div>
@@ -1963,15 +2094,14 @@
     save();
     if (!keepScroll) snapshotVersion();   // 手動微調不另存版本，避免版本清單被灌爆
     const plan = generate();
+    lastPlan = plan;
     renderResult(plan);
     $('#pick').style.display = 'none';
     $('#result').style.display = '';
     if (!keepScroll) window.scrollTo({ top: 0 });
     try {
-      const p = encPins();
-      const dc = state.dayCl ? '&dc=' + state.dayCl.join('.') : '';
       history.replaceState(null, '', location.pathname + '?s=' + [...state.sel].sort().join('.') +
-        (state.autoFill ? '' : '&af=0') + (p ? '&p=' + p : '') + dc);
+        (state.autoFill ? '' : '&af=0') + extraParams());
     } catch (e) {}
   }
   function showPick() {
@@ -1995,7 +2125,37 @@
      每次渲染都重綁會讓同一次點擊觸發 N 個處理器（呼叫次數指數成長） */
   function bindResultEvents() {
     $('#result-inner').addEventListener('click', e => {
-      if (e.target.closest('#resetPins')) { state.pins = {}; state.dayCl = null; reflow('已還原成系統自動安排'); return; }
+      if (e.target.closest('#resetPins')) { state.pins = {}; state.stPins = {}; state.ord = {}; state.dayCl = null; reflow('已還原成系統自動安排'); return; }
+      /* ▲▼ 本日排序：以當天實際停靠序列為底，交換相鄰兩站後存成該天的手動順序 */
+      const ro = e.target.closest('[data-ro]');
+      if (ro) {
+        const [di, si, dir] = ro.dataset.ro.split('|').map(Number);
+        const day = lastPlan && lastPlan.days[di];
+        if (!day || !day.seq) return;
+        const j = si + dir;
+        if (j < 0 || j >= day.seq.length) return;
+        const keys = day.seq.map(stopKey).filter(Boolean);
+        if (si >= keys.length || j >= keys.length) return;
+        const t0 = keys[si]; keys[si] = keys[j]; keys[j] = t0;
+        state.ord[di] = keys;
+        reflow('已調整本日順序，時間與交通重新試算好了');
+        return;
+      }
+      const smv = e.target.closest('[data-stmv]');
+      if (smv) {
+        const a = smv.dataset.stmv.split('|');
+        const sid = a[0], di = +a[1];
+        if (di < 0 || di > 4 || !STORES[sid]) return;
+        state.stPins[sid] = { d: di };
+        reflow(`已把「${STORES[sid].name}」的採購移到 Day ${di + 1}，行程重新排好了`);
+        return;
+      }
+      const sa = e.target.closest('[data-stauto]');
+      if (sa) {
+        delete state.stPins[sa.dataset.stauto];
+        reflow('這站採購已改回系統自動安排');
+        return;
+      }
       const ad = e.target.closest('[data-add]');
       if (ad) {
         const [id, d] = ad.dataset.add.split('|');
@@ -2024,6 +2184,21 @@
       }
     });
     $('#result-inner').addEventListener('change', e => {
+      const sd = e.target.closest('[data-stday]');
+      if (sd) {
+        const sid = sd.dataset.stday;
+        if (!STORES[sid]) return;
+        if (sd.value === '') {
+          delete state.stPins[sid];
+          reflow(`「${STORES[sid].name}」已改回系統自動安排`);
+          return;
+        }
+        const di = +sd.value;
+        if (!(di >= 0 && di <= 4)) return;
+        state.stPins[sid] = { d: di };
+        reflow(`已把「${STORES[sid].name}」的採購指定到 Day ${di + 1}，行程重新排好了`);
+        return;
+      }
       const sel = e.target.closest('[data-slot]');
       if (!sel) return;
       const [id, d] = sel.dataset.slot.split('|');
@@ -2044,6 +2219,14 @@
       const pin = state.pins[id];
       if (pin.d === a) pin.d = b; else if (pin.d === b) pin.d = a;
     });
+    Object.keys(state.stPins).forEach(k => {
+      const p = state.stPins[k];
+      if (p.d === a) p.d = b; else if (p.d === b) p.d = a;
+    });
+    const oa = state.ord[a], ob = state.ord[b];
+    delete state.ord[a]; delete state.ord[b];
+    if (ob) state.ord[a] = ob;
+    if (oa) state.ord[b] = oa;
     reflow(`Day ${a + 1} 與 Day ${b + 1} 已整天對調（${CLUSTERS[arr[pa]].short} ↔ ${CLUSTERS[arr[pb]].short}），時間與交通都重新算過了`);
   }
 
