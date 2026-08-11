@@ -7,7 +7,7 @@
 
 const CONFIG = {
   baseUrl: 'https://kenhuangads.github.io/busan-trip/',
-  build: '20260811d',   // 版本標示：手機看到的號碼跟這裡不同就是載到舊版（重新整理即可）
+  build: '20260811e',   // 版本標示：手機看到的號碼跟這裡不同就是載到舊版（重新整理即可）
   rateNote: '價格換算基準：1,000韓元 ≈ NT$21.5（2026年7月匯率）。所有金額為 2026 年估算平均範圍，實際以現場為準。',
   minSpots: 3,
   minFoods: 6,
@@ -161,7 +161,7 @@ const FOODS = [
   { id:'f08', kind:'food', cat:'bbq', name:'味贊王鹽烤肉 西面店', kr:'맛찬들왕소금구이 서면점', cluster:'seomyeon', area:'西面（田浦一帶）', slot:'dinner', est:600, brand:'matchandeul',
     price:'均消約NT$500-700／人（14,000₩/份）', wait:'可用 Tabling 遠端排隊（4.7分／4,512則，App 可看目前等待組數）；現場抽號尖峰約30-45分',
     desc:'主打 3.5 公分厚切豬五花、專人代烤，蝦醬與烤鮮蚵的搭配是招牌吃法，是台灣人最熟的釜山烤肉名單。',
-    tag:'厚切五花・專人代烤', links:{ nid:'32738998', telSoft:1, tel:'0507-1383-6088', g:'맛찬들왕소금구이 서면점', n:'맛찬들왕소금구이', o:'http://www.matwang.com/', tb:'맛찬들왕소금구이 서면점' } },
+    tag:'厚切五花・專人代烤', links:{ nid:'32738998', tel:'051-808-6088', g:'맛찬들왕소금구이 서면점', n:'맛찬들왕소금구이', o:'http://www.matwang.com/', tb:'맛찬들왕소금구이 서면점' } },
   { id:'f63', kind:'food', cat:'bbq', name:'味贊王鹽烤肉 海雲台店', kr:'맛찬들왕소금구이 해운대점', cluster:'east', area:'海雲台站步行3分・海雲台市場旁', slot:'dinner', est:600, brand:'matchandeul',
     price:'均消約NT$500-700／人（14,000₩/份）', wait:'可用 Tabling 遠端排隊（4.7分／2,655則）；現場抽號尖峰約30-45分',
     desc:'同樣的 3.5 公分厚切豬五花與專人代烤，蝦醬配烤鮮蚵的招牌吃法一模一樣，位置就在海雲台站與市場旁。安排海雲台那天的晚餐比跑回西面省下一趟車程。',
@@ -361,7 +361,7 @@ const FOODS = [
   { id:'f53', kind:'food', cat:'bbq', name:'釜山烤肋排', kr:'부산쪽쪽갈비', cluster:'seomyeon', area:'西面', slot:'dinner', est:540,
     price:'均消約NT$430-645／人（20,000-30,000₩；首輪需點 3 份）', wait:'17:00 開門僅晚餐；CatchTable 登記或開門前到，否則約等1小時',
     desc:'西面超人氣豬肋排專門店，鹽味／醬味先烤到八分熟上桌、軟嫩入口即化，配冷麵與蔥餅收尾；只開晚上、天天排隊，建議提前預約。',
-    tag:'口袋名單・需預約', links:{ nid:'12039309', telSoft:1, tel:'0507-1369-8806', g:'부산쪽쪽갈비', n:'부산쪽쪽갈비', ct:'부산쪽쪽갈비', ctS:'busanjjokjjokgalbi', ctBook:1 } },
+    tag:'口袋名單・需預約', links:{ nid:'12039309', tel:'051-816-8803', g:'부산쪽쪽갈비', n:'부산쪽쪽갈비', ct:'부산쪽쪽갈비', ctS:'busanjjokjjokgalbi', ctBook:1 } },
   { id:'f54', kind:'food', cat:'crab', name:'新沙花蟹堂（海雲台店）', kr:'신사꽃게당 해운대점', cluster:'east', area:'海雲台・Harbour Town 2樓', slot:'dinner', est:1150,
     price:'花蟹套餐約 45,000-65,000₩／人 ≈ NT$970-1,400（蒸蟹＋醬蟹＋花蟹鍋）', wait:'4.9 分高人氣，建議 CatchTable 預約；桌邊平板點餐',
     desc:'海雲台海邊 Harbour Town 2 樓的花蟹料理專門店，清蒸花蟹蟹肉飽滿香甜，套餐含醬蟹、花蟹鍋與拉麵沙里，環境高級安靜，約會大餐首選。',

@@ -14,17 +14,24 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   const gmap = q => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
   const nmap = q => 'https://map.naver.com/p/search/' + encodeURIComponent(q);
-  /* NAVER 地圖「開啟 App 並跳到指定店家」——用官方 launchApp（inapp.map.naver.com/launchApp/*
-     已登錄 Universal Link／App Link）：iOS 走 navermaps:// scheme、Android 走 intent:// 帶
-     package=com.nhn.android.nmap，沒裝 App 時自動落回 fallbackUrl 的網頁版地圖。
-     有店家 id 就直達店家頁；沒有 id 的退而求其次開 App 的搜尋結果。 */
+  /* ---- NAVER 地圖 App 直達 ----
+     原本掛 NAVER 官方的 inapp.map.naver.com/launchApp 連結，但讀它的前端程式碼發現
+     iOS 分支條件是 (isInappWebView || 使用者手動按頁內按鈕)——一般 iPhone Safari 點進去
+     根本不會嘗試開 App，450ms 後就直接轉去網頁版地圖。所以改成自己在「使用者點擊」的
+     手勢中直接叫 App：
+       iOS     → nmap://place?id=…（叫不動就 1.4 秒後改開網頁版）
+       Android → intent://…#Intent;scheme=nmap;package=com.nhn.android.nmap;
+                 S.browser_fallback_url=…（沒裝 App 由系統自動落回網頁，不會卡住）
+     nmap／navermaps 兩個 scheme 都在 NAVER 官方白名單內。桌機不攔截，照常開網頁版。 */
   const APPNAME = 'kenhuangads.github.io';
-  const nlaunch = (target, params, fallback) =>
-    'https://inapp.map.naver.com/launchApp/' + target + '?' +
-    Object.entries(params).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&') +
-    '&appname=' + APPNAME + '&fallbackUrl=' + encodeURIComponent(fallback);
-  const nplace = id => nlaunch('place', { id }, 'https://map.naver.com/p/entry/place/' + id);
-  const nsearch = q => nlaunch('search', { query: q }, nmap(q));
+  const nvTarget = (kind, val) => kind === 'place'
+    ? 'place?id=' + encodeURIComponent(val) + '&appname=' + APPNAME
+    : 'search?query=' + encodeURIComponent(val) + '&appname=' + APPNAME;
+  const nvWeb = (kind, val) => kind === 'place'
+    ? 'https://map.naver.com/p/entry/place/' + encodeURIComponent(val)
+    : nmap(val);
+  const nvLink = (kind, val, label) =>
+    `<a class="nv" href="${nvWeb(kind, val)}" data-nv="${esc(nvTarget(kind, val))}" target="_blank" rel="noopener">${label}</a>`;
   const gsearch = q => 'https://www.google.com/search?q=' + encodeURIComponent(q);
   // CatchTable（캐치테이블）：帶關鍵字直接開到該店的搜尋結果，點進去就能訂位／線上候位
   const ctable = q => 'https://app.catchtable.co.kr/ct/map/COMMON?showTabs=true&serviceType=INTEGRATION' +
@@ -125,8 +132,8 @@
     if (links.tb) a.push(`<a class="bk" href="${tabling(links.tb)}" target="_blank" rel="noopener">⏳ Tabling 候位</a>`);
     if (imgQuery) a.push(`<a href="${gimg(imgQuery)}" target="_blank" rel="noopener">📷 實景圖片</a>`);
     // 有 NAVER 店家 id → 手機點了直接開 App 到「那一家」的頁面（沒裝 App 則開網頁版）
-    if (links.nid) a.push(`<a class="nv" href="${nplace(links.nid)}" target="_blank" rel="noopener">🗺️ NAVER・App直達</a>`);
-    else if (links.n) a.push(`<a class="nv" href="${nsearch(links.n)}" target="_blank" rel="noopener">🗺️ NAVER</a>`);
+    if (links.nid) a.push(nvLink('place', links.nid, '🗺️ NAVER・App直達'));
+    else if (links.n) a.push(nvLink('search', links.n, '🗺️ NAVER'));
     return `<div class="links" onclick="event.stopPropagation()">${a.join('')}</div>`;
   }
   // 圖片搜尋關鍵字：優先用「對準清單品項」的精準韓文商品名，其次店名
@@ -1795,7 +1802,7 @@
       ${shopHtml}
       <footer class="r-foot">
         <div class="tip">🗺️ <b>找店最快的方式：</b>按藍色的 <b>「NAVER・App直達」</b>——手機裝了 NAVER 地圖 App 會<b>直接跳到那一家的店家頁</b>（不用搜尋、不會跑錯分店），沒裝 App 就開網頁版地圖。美食 88 家、景點 10 處、購物門市 19 間都已逐一核對過店家頁面。</div>
-        <div class="tip">📞 <b>電話按鈕：</b>點一下複製。綠色的貼進 NAVER 搜尋框一貼就中；<b>灰色標「撥打用」的是店家的 0507 代理號碼（안심번호）</b>，這種號碼會被多家業者共用，搜尋會跳出別家（例如味贊王鹽烤肉西面店），只適合直接撥打——要找店請按「NAVER・App直達」。少數店家沒在 NAVER 登記電話就不放號碼，不放查不到的東西。</div>
+        <div class="tip">📞 <b>電話按鈕：</b>點一下複製。綠色的 79 支都實測過「貼進 NAVER 搜尋框第一筆就是這家」；剩下 3 家（安木西面店、海雲台31cm刀削麵、開琴小麥冷麵）只查得到 <b>0507 代理號碼（안심번호）</b>——這種號碼多家業者共用，搜尋會跳出別家，所以標成灰色「撥打用」，找店請改按上面的 App直達。少數店家沒在 NAVER 登記電話就不放號碼，不放查不到的東西。</div>
         <div class="tip">📱 <b>排隊神器：</b>標「App直達」的 CatchTable 鈕會直接開到<b>那間店的頁面</b>——手機裝了 <b>CatchTable Global</b>（外國人版，Google/Apple 帳號即可註冊、免韓國門號）點連結就自動跳進 App，線上訂位或遠端抽號一氣呵成；沒裝 App 則開繁中網頁版，一樣能操作。現場機台可輸入 Email 登記並拍下 QR Code 留存。</div>
         <div class="tip">💡 ${esc(CONFIG.rateNote)}</div>
         <div class="tip buildtip">🔄 版本 ${esc(CONFIG.build || '-')}｜手機若看不到新功能（例如每個項目下方的「調整」列），代表載到快取的舊版：下拉重新整理，或關掉分頁重開即可。</div>
@@ -2255,6 +2262,36 @@
 
   function bindEvents() {
     bindResultEvents();
+    /* NAVER 連結：手機用使用者的點擊手勢直接叫 App（桌機不攔，照常開網頁版） */
+    document.addEventListener('click', e => {
+      const a = e.target.closest('a[data-nv]');
+      if (!a) return;
+      const ua = navigator.userAgent || '';
+      const isAndroid = /Android/i.test(ua);
+      const isIOS = /iPad|iPhone|iPod/i.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 2);
+      if (!isAndroid && !isIOS) return;
+      e.preventDefault(); e.stopPropagation();
+      const target = a.dataset.nv, web = a.href;
+      if (isAndroid) {
+        // intent:// 由 Android 系統處理沒裝 App 的情況，直接落回網頁版
+        location.href = 'intent://' + target +
+          '#Intent;scheme=nmap;action=android.intent.action.VIEW;' +
+          'category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;' +
+          'S.browser_fallback_url=' + encodeURIComponent(web) + ';end';
+        return;
+      }
+      // iOS：叫得動 App 就會切過去（頁面被隱藏），沒切走代表沒裝 → 開網頁版
+      const t0 = Date.now();
+      const timer = setTimeout(() => {
+        if (!document.hidden && Date.now() - t0 < 2600) location.href = web;
+      }, 1400);
+      const stop = () => { if (document.hidden) clearTimeout(timer); };
+      document.addEventListener('visibilitychange', stop, { once: true });
+      window.addEventListener('pagehide', () => clearTimeout(timer), { once: true });
+      location.href = 'nmap://' + target;
+    }, true);
+
     /* 電話一鍵複製（勾選頁與結果頁的卡片都會出現，委派一次搞定）。
        用捕獲階段：.links 容器有 stopPropagation，冒泡到不了 document */
     document.addEventListener('click', e => {
