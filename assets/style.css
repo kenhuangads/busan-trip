@@ -388,6 +388,18 @@ small { color: var(--ink-3); font-weight: 400; }
 .ed-sel:focus { outline: none; border-color: var(--ocean); }
 .links a.bk { background: #fff1e8; border-color: #f0c9ad; color: #b4541b; font-weight: 700; }
 .links a.bk:hover { background: #ffe4d2; border-color: #e08a4e; }
+/* ── v6：電話一鍵複製（貼到 NAVER 地圖搜尋最準） ── */
+.telbtn {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12.5px; font-weight: 700; color: #1f6e43;
+  background: #e9f7ef; border: 1px solid #bfe3cd; border-radius: 999px;
+  padding: 1px 10px; line-height: 1.55; letter-spacing: .2px;
+}
+.telbtn em { font-style: normal; font-weight: 400; font-size: 11px; color: #4f8a68; }
+.telbtn:hover { background: #d9f0e2; border-color: #8fcaa8; }
+.telbtn.done { background: #1f9d63; border-color: #1f9d63; color: #fff; }
+.telbtn.done em { color: #fff; }
+@media print { .telbtn { border: none; padding: 0; } .telbtn em { display: none; } }
 .badge.pin { background: #e8f0ff; color: #2b5fa8; border: 1px solid #b9cef0; }
 .r-actions button.rst { background: var(--sun); color: #4a3200; }
 @media print { .e-edit { display: none !important; } }

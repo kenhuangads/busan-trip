@@ -58,7 +58,8 @@
     /* 搜尋用全文索引：名稱／韓文／區域／門市／描述／標籤／分類 */
     const catL = it.kind === 'spot' ? '景點' : (it.kind === 'food' ? (FOOD_CATS[it.cat] || {}).label : (SHOP_CATS[it.cat] || {}).label);
     it._hay = [it.name, it.kr, it.area, it.buy, it.desc, it.tag, it.price, catL,
-      it._store ? it._store.name : '', (META[it.id] || {}).img || ''].join(' ').toLowerCase();
+      it._store ? it._store.name : '', (META[it.id] || {}).img || '',
+      (it.links || {}).tel || ''].join(' ').toLowerCase();
     DB[it.id] = it;
   });
   const matchQ = (it, q) => !q || q.toLowerCase().split(/\s+/).every(t => it._hay.includes(t));
@@ -97,6 +98,7 @@
     if (!links && !imgQuery) return '';
     links = links || {};
     const a = [];
+    if (links.tel) a.push(`<button type="button" class="telbtn" data-tel="${esc(links.tel)}" title="點一下複製電話——貼到 NAVER 地圖搜尋最快最準">📞 ${esc(links.tel)} <em>複製</em></button>`);
     if (links.g) a.push(`<a href="${gmap(links.g)}" target="_blank" rel="noopener">📍 Google地圖</a>`);
     if (links.zh) a.push(`<a href="${esc(links.zh)}" target="_blank" rel="noopener">🇹🇼 繁中介紹</a>`);
     if (links.o) a.push(`<a href="${esc(links.o)}" target="_blank" rel="noopener">🌐 官網／介紹</a>`);
@@ -1773,6 +1775,7 @@
       ${dayHtml}
       ${shopHtml}
       <footer class="r-foot">
+        <div class="tip">📞 <b>用電話找店最準：</b>餐飲項目的綠色電話鈕點一下就複製，貼進 <b>NAVER 地圖</b>搜尋框——韓國店名常有多家分店同名，用電話一貼就只跳出正確的那一家（實測 82 家逐支反查過）。少數店家沒在 NAVER 登記電話（Hash Table、HELMET、THE BARN BERLIN、豚笑廣安店、BIFF 昇基堅果黑糖餅、樂天光復店的尚國家、Blue Bottle）就只放地圖連結，不放查不到的號碼。</div>
         <div class="tip">📱 <b>排隊神器：</b>標「App直達」的 CatchTable 鈕會直接開到<b>那間店的頁面</b>——手機裝了 <b>CatchTable Global</b>（外國人版，Google/Apple 帳號即可註冊、免韓國門號）點連結就自動跳進 App，線上訂位或遠端抽號一氣呵成；沒裝 App 則開繁中網頁版，一樣能操作。現場機台可輸入 Email 登記並拍下 QR Code 留存。</div>
         <div class="tip">💡 ${esc(CONFIG.rateNote)}</div>
         <div class="tip buildtip">🔄 版本 ${esc(CONFIG.build || '-')}｜手機若看不到新功能（例如每個項目下方的「調整」列），代表載到快取的舊版：下拉重新整理，或關掉分頁重開即可。</div>
@@ -2232,6 +2235,24 @@
 
   function bindEvents() {
     bindResultEvents();
+    /* 電話一鍵複製（勾選頁與結果頁的卡片都會出現，委派一次搞定）。
+       用捕獲階段：.links 容器有 stopPropagation，冒泡到不了 document */
+    document.addEventListener('click', e => {
+      const b = e.target.closest('[data-tel]');
+      if (!b) return;
+      e.preventDefault(); e.stopPropagation();
+      const tel = b.dataset.tel;
+      const done = () => {
+        const old = b.innerHTML;
+        b.innerHTML = '✅ 已複製';
+        b.classList.add('done');
+        setTimeout(() => { b.innerHTML = old; b.classList.remove('done'); }, 2200);
+        toast(`已複製 ${tel}——開 NAVER 地圖貼上搜尋，一秒直達店家`);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(tel).then(done).catch(() => fallbackCopy(tel, done));
+      } else fallbackCopy(tel, done);
+    }, true);
     $('#tabs').addEventListener('click', e => {
       const b = e.target.closest('[data-tab]'); if (!b) return;
       state.tab = b.dataset.tab; renderChips(); renderGrid();
