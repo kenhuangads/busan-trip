@@ -1801,7 +1801,7 @@
       ${dayHtml}
       ${shopHtml}
       <footer class="r-foot">
-        <div class="tip">🗺️ <b>找店最快的方式：</b>按藍色的 <b>「NAVER・App直達」</b>——手機裝了 NAVER 地圖 App 會<b>直接跳到那一家的店家頁</b>（不用搜尋、不會跑錯分店），沒裝 App 就開網頁版地圖。美食 88 家、景點 10 處、購物門市 19 間都已逐一核對過店家頁面。</div>
+        <div class="tip">🗺️ <b>找店最快的方式：</b>按藍色的 <b>「NAVER・App直達」</b>——手機裝了 NAVER 地圖 App 會<b>直接跳到那一家的店家頁</b>（不用搜尋、不會跑錯分店），沒裝 App 就開網頁版地圖。它會<b>另開一個分頁</b>去跳轉，<b>你現在看的行程表分頁不會被動到</b>，回 Safari 還是停在原來的位置（跳完可以把那個小分頁關掉）。美食 88 家、景點 10 處、購物門市 19 間都已逐一核對過店家頁面。</div>
         <div class="tip">📞 <b>電話按鈕：</b>點一下複製。綠色的 79 支都實測過「貼進 NAVER 搜尋框第一筆就是這家」；剩下 3 家（安木西面店、海雲台31cm刀削麵、開琴小麥冷麵）只查得到 <b>0507 代理號碼（안심번호）</b>——這種號碼多家業者共用，搜尋會跳出別家，所以標成灰色「撥打用」，找店請改按上面的 App直達。少數店家沒在 NAVER 登記電話就不放號碼，不放查不到的東西。</div>
         <div class="tip">📱 <b>排隊神器：</b>標「App直達」的 CatchTable 鈕會直接開到<b>那間店的頁面</b>——手機裝了 <b>CatchTable Global</b>（外國人版，Google/Apple 帳號即可註冊、免韓國門號）點連結就自動跳進 App，線上訂位或遠端抽號一氣呵成；沒裝 App 則開繁中網頁版，一樣能操作。現場機台可輸入 Email 登記並拍下 QR Code 留存。</div>
         <div class="tip">💡 ${esc(CONFIG.rateNote)}</div>
@@ -2262,7 +2262,8 @@
 
   function bindEvents() {
     bindResultEvents();
-    /* NAVER 連結：手機用使用者的點擊手勢直接叫 App（桌機不攔，照常開網頁版） */
+    /* NAVER 連結（手機）：另開新分頁，在「新分頁」裡叫 App——原本的行程表分頁
+       完全不動，回到 Safari 還是停在原來的行程上。桌機不攔截，照常開網頁版。 */
     document.addEventListener('click', e => {
       const a = e.target.closest('a[data-nv]');
       if (!a) return;
@@ -2271,25 +2272,35 @@
       const isIOS = /iPad|iPhone|iPod/i.test(ua) ||
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 2);
       if (!isAndroid && !isIOS) return;
-      e.preventDefault(); e.stopPropagation();
-      const target = a.dataset.nv, web = a.href;
-      if (isAndroid) {
-        // intent:// 由 Android 系統處理沒裝 App 的情況，直接落回網頁版
-        location.href = 'intent://' + target +
-          '#Intent;scheme=nmap;action=android.intent.action.VIEW;' +
+      const web = a.href, target = a.dataset.nv;
+      // Android 的 intent:// 自帶 fallback（沒裝 App 由系統轉網頁版）；iOS 用 scheme＋計時器
+      const deep = isAndroid
+        ? 'intent://' + target + '#Intent;scheme=nmap;action=android.intent.action.VIEW;' +
           'category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;' +
-          'S.browser_fallback_url=' + encodeURIComponent(web) + ';end';
-        return;
-      }
-      // iOS：叫得動 App 就會切過去（頁面被隱藏），沒切走代表沒裝 → 開網頁版
-      const t0 = Date.now();
-      const timer = setTimeout(() => {
-        if (!document.hidden && Date.now() - t0 < 2600) location.href = web;
-      }, 1400);
-      const stop = () => { if (document.hidden) clearTimeout(timer); };
-      document.addEventListener('visibilitychange', stop, { once: true });
-      window.addEventListener('pagehide', () => clearTimeout(timer), { once: true });
-      location.href = 'nmap://' + target;
+          'S.browser_fallback_url=' + encodeURIComponent(web) + ';end'
+        : 'nmap://' + target;
+      // 必須在點擊事件裡同步開，否則會被彈出視窗阻擋；被擋就不攔截、交還原生行為
+      const w = window.open('', '_blank');
+      if (!w) return;
+      e.preventDefault(); e.stopPropagation();
+      // 新分頁是 about:blank（同源），可以自己寫入一段跳轉用的小頁面
+      const j = JSON.stringify;
+      w.document.write(
+        '<!doctype html><meta charset="utf-8">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<title>開啟 NAVER 地圖…</title>' +
+        '<body style="margin:0;display:flex;min-height:90vh;align-items:center;justify-content:center;' +
+        'font-family:-apple-system,\'Noto Sans TC\',sans-serif;color:#37414f;text-align:center;line-height:1.9">' +
+        '<div><div style="font-size:34px">🗺️</div><b>正在開啟 NAVER 地圖 App…</b>' +
+        '<div style="font-size:13px;color:#7b8697;margin-top:6px">開好之後可以關掉這個分頁，<br>' +
+        '你原本的行程表還在前一個分頁裡</div>' +
+        '<div style="margin-top:14px"><a href="' + esc(web) + '" style="font-size:13px;color:#1f5fbf">' +
+        '沒有跳轉的話 → 改開網頁版地圖</a></div></div>' +
+        '<' + 'script>location.href=' + j(deep) + ';' +
+        // App 開起來時本頁會被隱藏 → 不要再跳網頁版，讓它停在這個提示畫面
+        (isAndroid ? '' : 'setTimeout(function(){if(!document.hidden)location.replace(' + j(web) + ')},1500);') +
+        '<' + '/script>');
+      w.document.close();
     }, true);
 
     /* 電話一鍵複製（勾選頁與結果頁的卡片都會出現，委派一次搞定）。
