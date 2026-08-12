@@ -106,6 +106,7 @@
     fromShare: false,
     draftOpen: false,
     pins: {},               // 手動調整：{ 項目id: { d:第幾天(0-4), s:時段key或null } }
+    at: {},                 // 已預約的時段：{ 項目id: 分鐘 }（例如膠囊列車 14:00 → 840）
     stPins: {},             // 購物門市手動指定：{ 門市key: { d:第幾天(0-4) } }
     ord: {},                // 當日手動排序：{ 第幾天: [停靠點key…] }（key＝項目id／st:門市／d5shop／anchor）
     dayCl: null             // 整天對調：Day2-4 各自負責的生活圈，null＝系統自動安排
@@ -161,6 +162,7 @@
       localStorage.setItem('busan_sel_v2', JSON.stringify([...state.sel]));
       localStorage.setItem('busan_af_v2', state.autoFill ? '1' : '0');
       localStorage.setItem('busan_pins_v1', JSON.stringify(state.pins));
+      localStorage.setItem('busan_at_v1', JSON.stringify(state.at));
       localStorage.setItem('busan_stpin_v1', JSON.stringify(state.stPins));
       localStorage.setItem('busan_ord_v1', JSON.stringify(state.ord));
       localStorage.setItem('busan_daycl_v1', JSON.stringify(state.dayCl));
@@ -172,6 +174,7 @@
       s.forEach(id => { if (DB[id]) state.sel.add(id); });
       state.autoFill = localStorage.getItem('busan_af_v2') !== '0';
       try { state.pins = JSON.parse(localStorage.getItem('busan_pins_v1') || '{}') || {}; } catch (e) { state.pins = {}; }
+      try { state.at = JSON.parse(localStorage.getItem('busan_at_v1') || '{}') || {}; } catch (e) { state.at = {}; }
       try { state.stPins = JSON.parse(localStorage.getItem('busan_stpin_v1') || '{}') || {}; } catch (e) { state.stPins = {}; }
       try { state.ord = JSON.parse(localStorage.getItem('busan_ord_v1') || '{}') || {}; } catch (e) { state.ord = {}; }
       try { state.dayCl = JSON.parse(localStorage.getItem('busan_daycl_v1') || 'null'); } catch (e) { state.dayCl = null; }
@@ -186,10 +189,14 @@
   const encOrd = () => Object.entries(state.ord)
     .filter(([, keys]) => keys && keys.length)
     .map(([d, keys]) => d + '.' + keys.join('.')).join('~');
+  const encAt = () => Object.entries(state.at)
+    .filter(([id]) => DB[id] && state.sel.has(id))
+    .map(([id, m]) => id + '-' + m).join('.');
   const extraParams = () => {
-    const p = encPins(), sp = encStPins(), o = encOrd();
+    const p = encPins(), sp = encStPins(), o = encOrd(), at = encAt();
     const dc = state.dayCl ? '&dc=' + state.dayCl.join('.') : '';
-    return (p ? '&p=' + p : '') + (sp ? '&sp=' + sp : '') + (o ? '&o=' + encodeURIComponent(o) : '') + dc;
+    return (p ? '&p=' + p : '') + (sp ? '&sp=' + sp : '') + (o ? '&o=' + encodeURIComponent(o) : '') +
+      (at ? '&at=' + at : '') + dc;
   };
   function shareUrl() {
     const ids = [...state.sel].sort();
@@ -216,6 +223,14 @@
       if (i <= 0) return;
       const k = t.slice(0, i), d = +t.slice(i + 1);
       if (STORES[k] && d >= 0 && d <= 4) state.stPins[k] = { d };
+    });
+    const at = p.get('at');
+    state.at = {};
+    if (at) at.split('.').forEach(t => {
+      const i = t.lastIndexOf('-');
+      if (i <= 0) return;
+      const id = t.slice(0, i), m = +t.slice(i + 1);
+      if (DB[id] && m >= 0 && m < 1440) state.at[id] = m;
     });
     const o = p.get('o');
     state.ord = {};
@@ -653,6 +668,21 @@
     computeTimeline(day);
   }
 
+  /* ---- 已預約時段 ----
+     使用者填了預約時間（例如天空膠囊列車訂 14:00），就以它為錨點：
+     有分段行程（plan）時，預約的是 planAnchor 指到的那一段，所以要往前扣掉
+     前面幾段（取票候車）的時間，反推「幾點該到這一站」。 */
+  function atAlign(stop, start) {
+    const it = stop.type === 'cell' && stop.cell && stop.cell.item;
+    const at = it && state.at[it.id];
+    if (at == null) return null;
+    const lead = (it.plan && it.planAnchor != null)
+      ? it.plan.slice(0, it.planAnchor).reduce((s, x) => s + x.mins, 0) : 0;
+    const need = at - lead;
+    return { at, need, lead, late: need < start, short: need < start ? start - need : 0,
+      label: (it.plan && it.planAnchor != null) ? it.plan[it.planAnchor].label : null };
+  }
+
   /* ---- 出爐／場次對齊 ----
      像自然島鹽麵包這種「一天只烤 6 批、賣完等下一批」的店，光看營業時間會誤判。
      抵達時間落在剛出爐後的寬限內就當買得到；否則把開始時間推到下一批（等候誠實
@@ -705,6 +735,9 @@
       const arr0 = time + (near ? 3 : tr.mins);
       let start = ceil5(arr0);
       if (target && target > start) start = target;
+      // 已預約的時段（例如膠囊列車 14:00）：以預約時間為準往前反推該幾點到
+      const aInfo = atAlign(stop, start);
+      if (aInfo && aInfo.need > start) start = aInfo.need;
       // 出爐／整點場次：對齊到真的買得到的那一批，等候時間誠實算進時間軸
       const bInfo = batchAlign(stop, start);
       if (bInfo && bInfo.start > start) start = bInfo.start;
@@ -731,7 +764,7 @@
       const end = start + stay;
       if (stop.type === 'store') rows.push({ k: 'store', t: start, end, stay, g: stop, si });
       else if (stop.type === 'd5shop') rows.push({ k: 'd5shop', t: start, end, stay, stores: stop.stores, warn: stop.warn, si });
-      else rows.push({ k: 'item', t: start, end, stay, slotKey: stop.slotKey, cell: stop.cell, si, batch: bInfo, arrAt: ceil5(arr0) });
+      else rows.push({ k: 'item', t: start, end, stay, slotKey: stop.slotKey, cell: stop.cell, si, batch: bInfo, at: aInfo, arrAt: ceil5(arr0) });
       time = end;
       cur = pos;
     });
@@ -1518,9 +1551,24 @@
       ${it.wait ? `<div class="e-meta sub">⏱ ${esc(it.wait)}</div>` : ''}
       ${siblings(it).length ? `<div class="e-meta sub">🏪 走不到也沒關係：${siblings(it).map(s => esc(s.area)).join('、')}也有分店</div>` : ''}
       ${it.close != null && r.end > it.close ? `<div class="e-meta warnline">⚠️ 這家約 ${fmtT(it.close)} 打烊，此時段可能來不及——建議提前或改選同品牌其他分店</div>` : ''}
-      ${batchHtml(r)}
+      ${atHtml(r)}${batchHtml(r)}
       <div class="e-desc">${esc(it.desc)}</div>${planHtml(it, r.t)}${linkRow(it.links, imgQ(it))}
       ${editBar(it, day, r.slotKey, cell, r.si)}`);
+  }
+
+  /* 已預約時段提醒：來不來得及、幾點該到 */
+  function atHtml(r) {
+    const a = r.at;
+    if (!a) return '';
+    const what = a.label ? `的「${esc(a.label)}」` : '';
+    if (a.late) {
+      return `<div class="batchbox warn">⚠️ <b>預約 ${fmtT(a.at)}${what}可能來不及</b>——照這個順序最快
+        ${fmtT(r.t + a.lead)} 才輪到，差了 ${durTxt(a.short)}。
+        建議縮短前一站停留、改搭計程車，或用下面的「▲ 提早」把這站往前移。</div>`;
+    }
+    return `<div class="batchbox ok">🎫 <b>已預約 ${fmtT(a.at)}${what}</b>——行程以它為準往前反推：
+      ${a.lead ? `需在 <b>${fmtT(a.need)}</b> 前到站（留 ${durTxt(a.lead)} 取票候車）` : `需在 <b>${fmtT(a.need)}</b> 前抵達`}，
+      上面的時間已經照這個算好了。</div>`;
   }
 
   /* 出爐場次提醒：講清楚「這個時間到到底買不買得到」，以及怎麼調整才不用乾等 */
@@ -1581,6 +1629,8 @@
       <button class="ed" data-mv="${it.id}|${di - 1}"${di <= 0 ? ' disabled' : ''} title="移到前一天">◀ ${di > 0 ? 'Day' + di : '前一天'}</button>
       <button class="ed" data-mv="${it.id}|${di + 1}"${di >= 4 ? ' disabled' : ''} title="移到後一天">${di < 4 ? 'Day' + (di + 2) : '後一天'} ▶</button>
       <select class="ed-sel" data-slot="${it.id}|${di}">${opts}</select>
+      <label class="ed-at" title="有預約就填時間（例如膠囊列車訂 14:00），行程會以它為準往前反推幾點該到">🎫
+        <input type="time" class="ed-time" data-at="${it.id}" value="${state.at[it.id] != null ? fmtT(state.at[it.id]) : ''}"></label>
       <button class="ed del" data-drop="${it.id}" title="從行程移除">✕ 移除</button>
     </div>`;
   }
@@ -2222,7 +2272,7 @@
      每次渲染都重綁會讓同一次點擊觸發 N 個處理器（呼叫次數指數成長） */
   function bindResultEvents() {
     $('#result-inner').addEventListener('click', e => {
-      if (e.target.closest('#resetPins')) { state.pins = {}; state.stPins = {}; state.ord = {}; state.dayCl = null; reflow('已還原成系統自動安排'); return; }
+      if (e.target.closest('#resetPins')) { state.pins = {}; state.stPins = {}; state.ord = {}; state.at = {}; state.dayCl = null; reflow('已還原成系統自動安排'); return; }
       /* ▲▼ 本日排序：以當天實際停靠序列為底，交換相鄰兩站後存成該天的手動順序 */
       const ro = e.target.closest('[data-ro]');
       if (ro) {
@@ -2281,6 +2331,17 @@
       }
     });
     $('#result-inner').addEventListener('change', e => {
+      const atEl = e.target.closest('[data-at]');
+      if (atEl) {
+        const id = atEl.dataset.at;
+        if (!DB[id]) return;
+        if (!atEl.value) { delete state.at[id]; reflow(`已取消「${DB[id].name}」的預約時間`); return; }
+        const p = atEl.value.split(':').map(Number);
+        if (p.length < 2 || isNaN(p[0]) || isNaN(p[1])) return;
+        state.at[id] = p[0] * 60 + p[1];
+        reflow(`已設定「${DB[id].name}」預約 ${atEl.value}，整天以它為準重排`);
+        return;
+      }
       const sd = e.target.closest('[data-stday]');
       if (sd) {
         const sid = sd.dataset.stday;

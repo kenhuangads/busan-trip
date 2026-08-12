@@ -7,7 +7,7 @@
 
 const CONFIG = {
   baseUrl: 'https://kenhuangads.github.io/busan-trip/',
-  build: '20260812e',   // 版本標示：手機看到的號碼跟這裡不同就是載到舊版（重新整理即可）
+  build: '20260812g',   // 版本標示：手機看到的號碼跟這裡不同就是載到舊版（重新整理即可）
   rateNote: '價格換算基準：1,000韓元 ≈ NT$21.5（2026年7月匯率）。所有金額為 2026 年估算平均範圍，實際以現場為準。',
   minSpots: 3,
   minFoods: 6,
@@ -75,12 +75,13 @@ const SPOTS = [
     plan: [
       { mins: 20, icon: '🎫', label: '尾浦站取票・候車', note: '線上預約要換實體票；沒預約的現場常等 30 分以上' },
       { mins: 30, icon: '🚡', label: '天空膠囊列車 尾浦 → 青沙浦', note: '2 公里、時速 4km 慢行，全程約 30 分（官方公告）' },
-      { mins: 80, icon: '📸', label: '青沙浦自由活動', note: '踏石展望台（玻璃地板）、紅白雙燈塔；BRONI 咖啡廳就在站旁' },
+      { mins: 80, icon: '📸', label: '青沙浦自由活動', note: '踏石展望台（玻璃地板）、紅白雙燈塔、灌籃高手平交道（往尾浦方向鐵道口）；BRONI 咖啡廳就在站旁' },
       { mins: 20, icon: '🚃', label: '海岸列車 青沙浦 → 尾浦', note: '車程約 12 分＋候車；每小時約 3 班（20 分一班）' }
     ],
     planHours: '9 月為旺季：膠囊列車 08:30-19:30、海岸列車運行到約 20:30，所以最晚 17:00 前開始這段行程比較從容',
+    planAnchor: 1,   // 「預約時間」指的是第 1 段（膠囊列車發車），前面的取票時間會自動往前扣
     planBack: '尾浦站',
-    planNote: '海岸列車往南可續坐到松亭（青沙浦→松亭再約 13 分），想多玩一站再折返也可以，回程時間往後加約 30 分。',
+    planNote: '下一站如果還有空檔，與其提早回尾浦乾等，不如直接在青沙浦多待——海岸列車每 20 分一班，晚一班回來就好（灌籃高手平交道、踏石展望台、BRONI 咖啡都在那一側）。海岸列車往南也可續坐到松亭（青沙浦→松亭再約 13 分），想多玩一站再折返，回程時間往後加約 30 分。',
     tag:'需提前預約', links:{ nid:'1007574852', g:'해운대 블루라인파크 미포정거장', n:'해운대 블루라인파크', o:'https://www.bluelinepark.com/', zh:'https://www.visitbusan.net/zht/index.do?menuCd=DOM_000000602002001000&uc_seq=980&lang_cd=cnb' } },
   { id:'s02', kind:'spot', name:'釜山 X the SKY 觀景台', kr:'부산엑스더스카이', cluster:'east', area:'海雲台 LCT 100樓', slot:'night', est:580,
     price:'成人門票 27,000₩ ≈ NT$580／人',
@@ -1253,7 +1254,8 @@ const META = {
   f51: { lat: 35.1500, lng: 129.1140, zone: 'gwangan',   stay: 80,  rec: 84 },
   f52: { lat: 35.1687, lng: 129.1752, zone: 'jwadong',   stay: 60,  rec: 87 },
   f53: { lat: 35.1590, lng: 129.0600, zone: 'seomyeon',  stay: 90,  rec: 89 },
-  f54: { lat: 35.1565, lng: 129.1505, zone: 'dongbaek',  stay: 90,  rec: 92 },
+  // 座標依 NAVER 實際店址修正（原本偏西南 0.89km，害車程被高估 17 分→實際約 13 分）
+  f54: { lat: 35.15961, lng: 129.15953, zone: 'haeundae', stay: 90,  rec: 92 },
   f55: { lat: 35.1162, lng: 129.0414, zone: 'busanstation', stay: 30, rec: 87, open: 540, close: 1260 },
   f56: { lat: 35.1620, lng: 129.1630, zone: 'haeundae',  stay: 60, rec: 86, open: 600, close: 1500, closedDow: [3] },
   f57: { lat: 35.1628, lng: 129.1629, zone: 'haeundae',  stay: 30, rec: 88, open: 480, close: 1320 },
