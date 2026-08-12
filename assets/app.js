@@ -1492,8 +1492,24 @@
       ${it.wait ? `<div class="e-meta sub">⏱ ${esc(it.wait)}</div>` : ''}
       ${siblings(it).length ? `<div class="e-meta sub">🏪 走不到也沒關係：${siblings(it).map(s => esc(s.area)).join('、')}也有分店</div>` : ''}
       ${it.close != null && r.end > it.close ? `<div class="e-meta warnline">⚠️ 這家約 ${fmtT(it.close)} 打烊，此時段可能來不及——建議提前或改選同品牌其他分店</div>` : ''}
-      <div class="e-desc">${esc(it.desc)}</div>${linkRow(it.links, imgQ(it))}
+      <div class="e-desc">${esc(it.desc)}</div>${planHtml(it, r.t)}${linkRow(it.links, imgQ(it))}
       ${editBar(it, day, r.slotKey, cell, r.si)}`);
+  }
+
+  /* 站內分段時刻（例如藍線公園「膠囊去＋海岸列車回」）：
+     依這一站的實際抵達時間，逐段算出幾點該做什麼、幾點要搭車回來 */
+  function planHtml(it, startMin) {
+    if (!it.plan || !it.plan.length) return '';
+    let t = startMin;
+    const rows = it.plan.map(s => {
+      const from = t; t += s.mins;
+      return `<div class="pl-row"><span class="pl-t">${fmtT(from)}–${fmtT(t)}</span>
+        <span class="pl-b"><b>${s.icon || '•'} ${esc(s.label)}</b><i>${durTxt(s.mins)}</i>
+        ${s.note ? `<em>${esc(s.note)}</em>` : ''}</span></div>`;
+    }).join('');
+    return `<div class="planbox"><div class="pl-h">🕒 這站怎麼玩（依上面的抵達時間推算）</div>${rows}
+      <div class="pl-end">${fmtT(t)} 回到${esc(it.planBack || '出發站')}，接著往下一站</div>
+      ${it.planNote ? `<div class="pl-note">💡 ${esc(it.planNote)}</div>` : ''}</div>`;
   }
 
   /* 本日內前後移（▲▼）：換完只重算時間，順序完全照使用者的 */
@@ -1757,7 +1773,9 @@
                  ${[0, 1, 2, 3, 4].map(i => `<option value="${i}"${pin && pin.d === i ? ' selected' : ''}>📌 Day ${i + 1}${i === 4 ? '（返程上午）' : ''}</option>`).join('')}
                </select></div>`
             : '';
-          return `<div class="shop-group"><h3>📍 ${esc(g)}</h3>${dayPick}${grp.items.map(it => {
+          // 門市備註（省錢撇步、退稅方式、避雷品項…）不該只在「有排進行程」時才看得到
+          const note = grp.store && grp.store.note ? `<div class="store-note">💡 ${esc(grp.store.note)}</div>` : '';
+          return `<div class="shop-group"><h3>📍 ${esc(g)}</h3>${note}${dayPick}${grp.items.map(it => {
             const ci = catInfo(it);
             const safeTxt = it.safe === 'warn' ? '<span class="badge warn">⚠️ 成分含肉禁帶</span>' :
               it.safe === 'ok-check' ? '<span class="badge note">須託運</span>' : '';
