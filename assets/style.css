@@ -388,6 +388,13 @@ small { color: var(--ink-3); font-weight: 400; }
 .ed-sel:focus { outline: none; border-color: var(--ocean); }
 .links a.bk { background: #fff1e8; border-color: #f0c9ad; color: #b4541b; font-weight: 700; }
 .links a.bk:hover { background: #ffe4d2; border-color: #e08a4e; }
+/* ── v6：出爐／場次提醒 ── */
+.batchbox { margin-top: 7px; padding: 7px 11px; border-radius: 10px; font-size: 12.8px; line-height: 1.75; }
+.batchbox.ok { background: #e9f7ef; border: 1px solid #bfe3cd; color: #1f6e43; }
+.batchbox.warn { background: #fff6e5; border: 1px solid #f0d4a0; color: #8a5a10; }
+.batchbox b { color: inherit; }
+.bt-all { display: block; margin-top: 3px; font-size: 11.5px; opacity: .85; }
+
 /* ── v6：站內分段時刻（藍線公園膠囊去＋海岸列車回） ── */
 .planbox { margin-top: 9px; padding: 9px 11px; background: #f2f8ff; border: 1px solid #cfe0f6; border-left: 4px solid var(--ocean); border-radius: 10px; }
 .pl-h { font-size: 12.5px; font-weight: 700; color: var(--ocean-deep); margin-bottom: 5px; }

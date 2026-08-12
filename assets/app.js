@@ -569,7 +569,8 @@
       if (!row) continue;
       const hr = tmp.tl.filter(x => x.k === 'hotel').pop();
       cand.push({ i: g.i, det: g.det, start: row.t, end: row.end,
-        meals: timingOk(tmp.tl), back: hr ? hr.t : 0 });
+        meals: timingOk(tmp.tl), back: hr ? hr.t : 0,
+        wait: (row.batch && row.batch.wait) || 0 });   // 要乾等出爐的位置要扣分
     }
     if (!cand.length) return false;
     const CLOSE_BUF = 15;                          // 打烊前留 15 分鐘結帳離場
@@ -583,7 +584,9 @@
     const CFL = day.key === 'd5' ? 740 : (day.curfewLimit || (CONFIG.curfew || {}).normal || 1290);
     const inTime = ok.filter(c => c.back && c.back <= CFL);
     const pool = inTime.length ? inTime : ok;
-    const pick = pool.sort((a, b) => a.det - b.det)[0];
+    // 先比「要等出爐多久」（20 分為一級，小差距視為同級），同級再比繞路
+    const waitLv = c => Math.floor((c.wait || 0) / 20);
+    const pick = pool.sort((a, b) => (waitLv(a) - waitLv(b)) || (a.det - b.det))[0];
     seq.splice(pick.i + 1, 0, stop);
     return true;
   }
@@ -650,6 +653,26 @@
     computeTimeline(day);
   }
 
+  /* ---- 出爐／場次對齊 ----
+     像自然島鹽麵包這種「一天只烤 6 批、賣完等下一批」的店，光看營業時間會誤判。
+     抵達時間落在剛出爐後的寬限內就當買得到；否則把開始時間推到下一批（等候誠實
+     算進時間軸，路線最佳化就會自動避開這種吃虧的排法）；連最後一批都過了就示警。 */
+  function batchAlign(stop, start) {
+    const it = stop.type === 'cell' && stop.cell && stop.cell.item;
+    const bs = it && it.batches;
+    if (!bs || !bs.length) return null;
+    const grace = (CONFIG.batchGrace != null) ? CONFIG.batchGrace : 25; // 出爐後多久內通常還有貨
+    const label = it.batchLabel || '出爐';
+    const past = bs.filter(b => b <= start);
+    const last = past.length ? past[past.length - 1] : null;
+    if (last != null && start - last <= grace) {
+      return { start, at: last, wait: 0, fresh: true, label, list: bs };
+    }
+    const next = bs.find(b => b > start);
+    if (next != null) return { start: next, at: next, wait: next - start, label, list: bs };
+    return { start, at: last, wait: 0, missed: true, label, list: bs };
+  }
+
   /* ---- 每日時間軸試算 ---- */
   function computeTimeline(day) {
     const t = CONFIG.trip;
@@ -682,6 +705,9 @@
       const arr0 = time + (near ? 3 : tr.mins);
       let start = ceil5(arr0);
       if (target && target > start) start = target;
+      // 出爐／整點場次：對齊到真的買得到的那一批，等候時間誠實算進時間軸
+      const bInfo = batchAlign(stop, start);
+      if (bInfo && bInfo.start > start) start = bInfo.start;
       if (near) {
         const gap = start - time;
         if (gap >= 25) rows.push({ k: 'free', t: time, mins: gap });
@@ -705,7 +731,7 @@
       const end = start + stay;
       if (stop.type === 'store') rows.push({ k: 'store', t: start, end, stay, g: stop, si });
       else if (stop.type === 'd5shop') rows.push({ k: 'd5shop', t: start, end, stay, stores: stop.stores, warn: stop.warn, si });
-      else rows.push({ k: 'item', t: start, end, stay, slotKey: stop.slotKey, cell: stop.cell, si });
+      else rows.push({ k: 'item', t: start, end, stay, slotKey: stop.slotKey, cell: stop.cell, si, batch: bInfo, arrAt: ceil5(arr0) });
       time = end;
       cur = pos;
     });
@@ -1492,8 +1518,30 @@
       ${it.wait ? `<div class="e-meta sub">⏱ ${esc(it.wait)}</div>` : ''}
       ${siblings(it).length ? `<div class="e-meta sub">🏪 走不到也沒關係：${siblings(it).map(s => esc(s.area)).join('、')}也有分店</div>` : ''}
       ${it.close != null && r.end > it.close ? `<div class="e-meta warnline">⚠️ 這家約 ${fmtT(it.close)} 打烊，此時段可能來不及——建議提前或改選同品牌其他分店</div>` : ''}
+      ${batchHtml(r)}
       <div class="e-desc">${esc(it.desc)}</div>${planHtml(it, r.t)}${linkRow(it.links, imgQ(it))}
       ${editBar(it, day, r.slotKey, cell, r.si)}`);
+  }
+
+  /* 出爐場次提醒：講清楚「這個時間到到底買不買得到」，以及怎麼調整才不用乾等 */
+  function batchHtml(r) {
+    const b = r.batch;
+    if (!b) return '';
+    const all = `<span class="bt-all">全天${esc(b.label)}：${b.list.map(x => fmtT(x)).join('／')}</span>`;
+    if (b.fresh) {
+      return `<div class="batchbox ok">✅ <b>剛好接上 ${fmtT(b.at)} 這批${esc(b.label)}</b>——抵達 ${fmtT(r.arrAt)}，
+        在${esc(b.label)}後 ${durTxt(r.arrAt - b.at)} 內到，通常還買得到。${all}</div>`;
+    }
+    if (b.missed) {
+      return `<div class="batchbox warn">⚠️ <b>今天最後一批 ${fmtT(b.at)} 已經過了</b>——這個時間到很可能已售完。
+        建議用下面的「▲ 提早」把這站往前移，或改到別天。${all}</div>`;
+    }
+    const isLast = b.at === b.list[b.list.length - 1];
+    return `<div class="batchbox warn">⏳ <b>會需要等${esc(b.label)}：</b>照這個順序走 ${fmtT(r.arrAt)} 到店，
+      前一批已經是 ${fmtT(b.list.filter(x => x < r.arrAt).pop() || b.list[0])}，多半賣完了；
+      <b>下一批 ${fmtT(b.at)}</b>，等候約 ${durTxt(b.wait)}（已經算進上面的時間，所以前一站可以慢慢玩）。
+      ${isLast ? '<b>⚠️ 而且這是今天最後一批，晚到就完全買不到了。</b>' : ''}
+      不想等的話：用下面的「▲ 提早」把這站移到前面，或縮短前一站的停留，趕在${esc(b.label)}後 25 分鐘內到。${all}</div>`;
   }
 
   /* 站內分段時刻（例如藍線公園「膠囊去＋海岸列車回」）：
@@ -1509,6 +1557,7 @@
     }).join('');
     return `<div class="planbox"><div class="pl-h">🕒 這站怎麼玩（依上面的抵達時間推算）</div>${rows}
       <div class="pl-end">${fmtT(t)} 回到${esc(it.planBack || '出發站')}，接著往下一站</div>
+      ${it.planHours ? `<div class="pl-note">🕗 ${esc(it.planHours)}</div>` : ''}
       ${it.planNote ? `<div class="pl-note">💡 ${esc(it.planNote)}</div>` : ''}</div>`;
   }
 
