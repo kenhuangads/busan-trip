@@ -1560,15 +1560,17 @@
   function atHtml(r) {
     const a = r.at;
     if (!a) return '';
+    const it0 = r.cell && r.cell.item;
+    const note = it0 && it0.atNote ? `<div class="bt-all">📌 ${esc(it0.atNote)}</div>` : '';
     const what = a.label ? `的「${esc(a.label)}」` : '';
     if (a.late) {
       return `<div class="batchbox warn">⚠️ <b>預約 ${fmtT(a.at)}${what}可能來不及</b>——照這個順序最快
         ${fmtT(r.t + a.lead)} 才輪到，差了 ${durTxt(a.short)}。
-        建議縮短前一站停留、改搭計程車，或用下面的「▲ 提早」把這站往前移。</div>`;
+        建議縮短前一站停留、改搭計程車，或用下面的「▲ 提早」把這站往前移。${note}</div>`;
     }
     return `<div class="batchbox ok">🎫 <b>已預約 ${fmtT(a.at)}${what}</b>——行程以它為準往前反推：
-      ${a.lead ? `需在 <b>${fmtT(a.need)}</b> 前到站（留 ${durTxt(a.lead)} 取票候車）` : `需在 <b>${fmtT(a.need)}</b> 前抵達`}，
-      上面的時間已經照這個算好了。</div>`;
+      ${a.lead ? `需在 <b>${fmtT(a.need)}</b> 前到站（留 ${durTxt(a.lead)} 報到換票）` : `需在 <b>${fmtT(a.need)}</b> 前抵達`}，
+      上面的時間已經照這個算好了。${note}</div>`;
   }
 
   /* 出爐場次提醒：講清楚「這個時間到到底買不買得到」，以及怎麼調整才不用乾等 */
