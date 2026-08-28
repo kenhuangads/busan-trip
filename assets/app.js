@@ -730,6 +730,7 @@
       : (day.seq[0] && day.seq[0].slotKey === 'brunch' ? 525 : 570);
     let transCost = 0, transMins = 0, transKm = 0;
     let lastMeal = -999;                       // 上一頓正餐的開始時間
+    let lastMealEnd = -999;                    // 上一頓正餐「吃完」的時間（宵夜間隔用）
     const MEAL_GAP = (CONFIG.mealGap != null) ? CONFIG.mealGap : 210;
     let lastGap = MEAL_GAP;                    // 上一頓要求的間隔（輕食減半）
     const modeCnt = { walk: 0, taxi: 0, metro: 0 };
@@ -768,12 +769,22 @@
       if (mealItem) {
         lastMeal = start;
         lastGap = isLightMeal(stop.cell.item) ? Math.round(MEAL_GAP / 2) : MEAL_GAP;
+        lastMealEnd = start + stayOfStop(stop, day);   // 記住這頓吃完的時間，宵夜要看它
+      }
+      // 宵夜（炸雞配啤酒這類）不算正餐、不受 3.5 小時限制，
+      // 但也不該晚餐一放下筷子就接著吃——至少留 supperGap 分鐘消化
+      let supperWait = 0;
+      const supperItem = stop.type === 'cell' && stop.cell && stop.cell.item &&
+        stop.cell.item.kind === 'food' && stop.cell.item.slot === 'supper';
+      if (supperItem) {
+        const SG = (CONFIG.supperGap != null) ? CONFIG.supperGap : 60;
+        if (start < lastMealEnd + SG) { supperWait = ceil5(lastMealEnd + SG) - start; start = ceil5(lastMealEnd + SG); }
       }
       const stay = stayOfStop(stop, day);
       const end = start + stay;
       if (stop.type === 'store') rows.push({ k: 'store', t: start, end, stay, g: stop, si });
       else if (stop.type === 'd5shop') rows.push({ k: 'd5shop', t: start, end, stay, stores: stop.stores, warn: stop.warn, si });
-      else rows.push({ k: 'item', t: start, end, stay, slotKey: stop.slotKey, cell: stop.cell, si, batch: bInfo, at: aInfo, arrAt: ceil5(arr0) });
+      else rows.push({ k: 'item', t: start, end, stay, slotKey: stop.slotKey, cell: stop.cell, si, batch: bInfo, at: aInfo, arrAt: ceil5(arr0), supperWait });
       time = end;
       cur = pos;
     });
@@ -1506,7 +1517,9 @@
     }
     if (r.k === 'store') {
       const g = r.g;
-      const lateWarn = r.end > (g.store.close || 1440)
+      const lateWarn = (g.store.close != null && r.t >= g.store.close)
+        ? `<div class="store-note">🚫 <b>該店 ${fmtT(g.store.close)} 打烊，這個時間已經關門</b>——請用「▲ 提早」移到打烊前，或改指定別天。</div>`
+        : r.end > (g.store.close || 1440)
         ? '<div class="store-note">⚠️ 此時段可能接近打烊，請以現場營業時間為準；來不及可改列自由採買。</div>' : '';
       const earlyWarn = g.store.open != null && r.t < g.store.open
         ? `<div class="store-note">⚠️ 該店 ${fmtT(g.store.open)} 才開門，請留意抵達時間或往後挪。</div>` : '';
@@ -1559,6 +1572,7 @@
         <span class="stay">⏳ 停留約${durTxt(r.stay)}</span></div>
       <div class="e-meta">📌 ${esc(it.area || '')} ｜ 💰 ${esc(it.price || '')}</div>
       ${it.wait ? `<div class="e-meta sub">⏱ ${esc(it.wait)}</div>` : ''}
+      ${r.supperWait ? `<div class="e-meta sub">🍽 晚餐吃完先消化——宵夜自動延後 ${durTxt(r.supperWait)} 開始（中間是自由時間，可先回飯店放戰利品）</div>` : ''}
       ${siblings(it).length ? `<div class="e-meta sub">🏪 走不到也沒關係：${siblings(it).map(s => esc(s.area)).join('、')}也有分店</div>` : ''}
       ${it.close != null && r.end > it.close ? `<div class="e-meta warnline">⚠️ 這家約 ${fmtT(it.close)} 打烊，此時段可能來不及——建議提前或改選同品牌其他分店</div>` : ''}
       ${atHtml(r)}${batchHtml(r)}
