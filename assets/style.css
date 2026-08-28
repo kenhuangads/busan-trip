@@ -536,3 +536,37 @@ small { color: var(--ink-3); font-weight: 400; }
 .unp-jump { font-size: 12px; color: var(--ocean); white-space: nowrap; }
 .tt-link { color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .shop-group { scroll-margin-top: 12px; }
+
+/* ── v7：可折疊區塊＋快速跳日列 ── */
+/* 不用 CSS smooth：長距離片段跳轉會被瀏覽器靜默取消，跳轉改由 JS 接管 */
+details.ov-wrap > summary, details.unp-wrap > summary {
+  cursor: pointer; list-style: none; user-select: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+}
+details.ov-wrap > summary::-webkit-details-marker, details.unp-wrap > summary::-webkit-details-marker { display: none; }
+details.ov-wrap > summary::before, details.unp-wrap > summary::before {
+  content: '▸'; font-size: 12px; color: var(--ink-3); transition: transform .15s; flex: none;
+}
+details[open].ov-wrap > summary::before, details[open].unp-wrap > summary::before { transform: rotate(90deg); }
+.sum-hint { font-style: normal; font-size: 12px; color: var(--ink-3); font-weight: 400; }
+details.unp-wrap .sum-hint { color: #a3610e; }
+details.ov-wrap .ov-body, details.unp-wrap .unp-list { margin-top: 8px; }
+details.unp-wrap > summary { margin-bottom: 0; }
+
+.daynav {
+  position: sticky; top: 0; z-index: 40;
+  display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none;
+  background: rgba(246,244,239,.94); backdrop-filter: blur(6px);
+  padding: 8px 2px; margin: 4px 0 10px; border-bottom: 1px solid var(--line);
+}
+.daynav::-webkit-scrollbar { display: none; }
+.daynav .dn-lab { flex: none; font-size: 12px; color: var(--ink-3); }
+.daynav a {
+  flex: none; display: inline-flex; align-items: baseline; gap: 3px;
+  border: 1.5px solid var(--line); background: var(--card); border-radius: 999px;
+  padding: 4px 12px; font-size: 13px; font-weight: 700; color: var(--ink-2); white-space: nowrap;
+}
+.daynav a:hover { border-color: var(--ocean); color: var(--ocean); text-decoration: none; }
+.daynav a i { font-style: normal; font-size: 11px; font-weight: 400; color: var(--ink-3); }
+.daynav .dn-top { margin-left: auto; }
+.day, .shoplist { scroll-margin-top: 56px; }
+#rtop { scroll-margin-top: 0; }

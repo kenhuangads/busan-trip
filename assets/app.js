@@ -1868,11 +1868,13 @@
           <a class="unp-jump" href="#sg-${u.storeId}">↓ 完整品項</a></div>
       </div>`;
     }).join('');
-    return `<div class="unp-wrap no-print" id="unpwrap">
-      <div class="unp-head">🛒 <b>${unp.length} 間門市這次排不進行程</b>——原因與想買的東西都在下面，選個日期就直接改排（會立刻重算整份行程）：</div>
+    return `<details class="unp-wrap no-print" id="unpwrap" data-ui="unp"${uiOpen.unp ? ' open' : ''}>
+      <summary class="unp-head">🛒 <b>${unp.length} 間門市這次排不進行程</b><i class="sum-hint">點開看原因、就地改排到別天</i></summary>
       <div class="unp-list">${cards}</div>
-    </div>`;
+    </details>`;
   }
+
+  const uiOpen = { unp: false, ov: false, hint: false };   // 可折疊區塊目前展開與否（重排後維持）
 
   let lastPlan = null;         // 最近一次產生的行程（▲▼ 排序要讀當天的實際停靠序列）
   let fullDayInfo = [];        // 整天對調用：[{ idx:第幾天, cluster:生活圈 }]
@@ -1916,7 +1918,7 @@
       const mealTip = (d.noLunch || d.noDinner) ? `<div class="tip holiday">🍽️ 這天${d.noLunch && d.noDinner ? '中午與晚上都' : d.noLunch ? '中午' : '晚上'}沒有安排用餐——${d.noLunch && !d.noDinner ? '上午的行程較滿，記得在景點附近先墊個東西' : '建議從下面的同區備選挑一家，或在附近隨機找一家'}。</div>` : '';
       const lunchTip = d.lunchDropped ? `<div class="tip">🍜 登機前時間有限，午餐建議外帶輕食或在機場用餐（金海機場餐飲選擇不少）。</div>` : '';
       return `
-      <section class="day" style="--c:${cl.color}">
+      <section class="day" id="day${i + 1}" style="--c:${cl.color}">
         <header class="day-head">
           <div class="day-no">Day ${i + 1}</div>
           <div><h2>${d.date}｜${esc(d.theme)}</h2><div class="day-cl">${esc(cl.label)}</div></div>
@@ -1947,7 +1949,7 @@
     let shopHtml = '';
     const groups = Object.keys(plan.shopGroups);
     if (groups.length) {
-      shopHtml = `<section class="shoplist"><h2>🛍️ 採購清單（${plan.shops.length} 項）</h2>
+      shopHtml = `<section class="shoplist" id="shoplist"><h2>🛍️ 採購清單（${plan.shops.length} 項）</h2>
         <p class="hint">💡 已依「實際門市」分組並排進每日行程。<b>退稅：</b>門檻已降到同店單筆滿 15,000₩，樂天／新世界百貨多數專櫃出示護照可直接用「現場免稅價」結帳（大同、READY YOUNG 等事後免稅藥局也支援）；拿到退稅單也不必等機場排隊——樂天百貨 1 樓有自動退稅機，刷護照與退稅單當場吐韓元現金。注意：現場即時退稅單筆限 100 萬₩、全程累計 500 萬₩；單筆退稅額超過 7.5 萬₩（約單筆消費 100 萬₩，例如精品包）須帶未拆封商品先到機場海關查驗蓋章、之後才能託運。</p>
         ${groups.map(g => {
           const grp = plan.shopGroups[g];
@@ -1973,7 +1975,7 @@
 
     const est = plan.cost;
     $('#result-inner').innerHTML = `
-      <header class="r-head">
+      <header class="r-head" id="rtop">
         <button class="back no-print" id="backBtn">← 回到勾選頁調整</button>
         ${state.fromShare ? '<div class="share-note no-print">🔗 這是分享連結的行程檢視，點左邊按鈕可調整重排</div>' : ''}
         <h1>🌊 我們的釜山行程出爐啦！</h1>
@@ -1987,9 +1989,9 @@
             <div class="sub">🚕 市區交通預估 ${money(plan.transTotal)}（2人合計）</div>
             ${plan.shopCost ? `<div class="sub">🛍️ 購物清單全買約 ${money(plan.shopCost)}</div>` : ''}</div>
         </div>
-        <div class="ov-wrap"><b>勾選總覽：</b>${overview}</div>
+        <details class="ov-wrap" data-ui="ov"${uiOpen.ov ? ' open' : ''}><summary><b>✅ 勾選總覽</b><i class="sum-hint">${plan.sel.filter(i => i.kind !== 'shop').length} 個景點與餐飲・點開檢視哪些有排入</i></summary><div class="ov-body">${overview}</div></details>
         ${unpHtml}
-        <div class="ov-wrap edit-hint no-print">✏️ <b>可以手動微調：</b>整天想換日子的話，用 Day 2～4 標題右邊的 <b>🔄 換天</b>——例如按 Day 2 的「↔ Day 3」，兩天的行程就整個對調（同一天的項目一起搬，公休日與交通會重算）。每個停靠點（景點、美食、<b>採購站也一樣</b>）下方都有「調整」列——<b>▲ ▼</b> 直接改當天的先後順序（改完出發抵達時間全部重新試算）、<b>◀ ▶</b> 搬到別天、<b>時段選單</b>改成當天其他時段、<b>✕ 移除</b>拿掉不想去的；Day 5 最終採購裡的每間店還能用下拉選單提前到別天買。改完系統會立刻重排整份行程（交通、用餐時間、回飯店時間都會重新計算），手動指定的會標上 📌 並優先保留、手動排的順序不會被系統推翻。</div>
+        <details class="ov-wrap edit-hint no-print" data-ui="hint"${uiOpen.hint ? ' open' : ''}><summary>✏️ <b>怎麼手動微調</b><i class="sum-hint">換天／改順序／改時段／預約時間…使用說明</i></summary><div class="ov-body">整天想換日子的話，用 Day 2～4 標題右邊的 <b>🔄 換天</b>——例如按 Day 2 的「↔ Day 3」，兩天的行程就整個對調（同一天的項目一起搬，公休日與交通會重算）。每個停靠點（景點、美食、<b>採購站也一樣</b>）下方都有「調整」列——<b>▲ ▼</b> 直接改當天的先後順序（改完出發抵達時間全部重新試算）、<b>◀ ▶</b> 搬到別天、<b>時段選單</b>改成當天其他時段、<b>✕ 移除</b>拿掉不想去的；Day 5 最終採購裡的每間店還能用下拉選單提前到別天買。改完系統會立刻重排整份行程（交通、用餐時間、回飯店時間都會重新計算），手動指定的會標上 📌 並優先保留、手動排的順序不會被系統推翻。</div></details>
         ${versionBarHtml()}
         <div class="r-actions no-print">
           <button id="copyText">📋 複製文字版行程</button>
@@ -2002,6 +2004,10 @@
             state.dayCl ? '已換過天' : ''].filter(Boolean).join('、')}）</button>` : ''}
         </div>
       </header>
+      <nav class="daynav no-print"><span class="dn-lab">跳到</span>
+        ${plan.days.map((d, i) => `<a href="#day${i + 1}">D${i + 1}<i>${esc((CLUSTERS[d.cluster] || {}).short || '')}</i></a>`).join('')}
+        ${Object.keys(plan.shopGroups).length ? '<a href="#shoplist">🛍️ 採購清單</a>' : ''}
+        <a href="#rtop" class="dn-top">⬆ 頂部</a></nav>
       ${dayHtml}
       ${shopHtml}
       <footer class="r-foot">
@@ -2014,11 +2020,19 @@
       </footer>
       ${sheetModalHtml()}`;
 
+    $$('#result-inner details[data-ui]').forEach(d =>
+      d.addEventListener('toggle', () => { uiOpen[d.dataset.ui] = d.open; }));
+
     $('#backBtn').addEventListener('click', () => { state.fromShare = false; showPick(); });
 
     $('#copyText').addEventListener('click', () => copyToClipboard(planText(plan), '#copyText', '📋 已複製！貼到 LINE 給旅伴看吧'));
     $('#copyLink').addEventListener('click', () => copyToClipboard(shareUrl(), '#copyLink', '🔗 連結已複製！'));
-    $('#printBtn').addEventListener('click', () => window.print());
+    $('#printBtn').addEventListener('click', () => {
+      const closed = $$('#result-inner details:not([open])');
+      closed.forEach(d => { d.open = true; });
+      window.print();
+      closed.forEach(d => { d.open = false; });
+    });
     $('#sheetBtn').addEventListener('click', () => { $('#gsMask').style.display = ''; });
     bindSheetModal(plan);
     bindVersionBar();
@@ -2358,6 +2372,22 @@
   /* 結果頁的委派事件只綁一次——#result-inner 不會被重建，
      每次渲染都重綁會讓同一次點擊觸發 N 個處理器（呼叫次數指數成長） */
   function bindResultEvents() {
+    /* 站內錨點：JS 接管跳轉——先展開目標所在的收合區塊，再直接捲過去
+       （原生 hash 跳轉在長頁面會被 smooth scroll 靜默取消，且重複點同一個錨點沒反應） */
+    $('#result-inner').addEventListener('click', e => {
+      const a = e.target.closest('a[href^="#"]');
+      if (!a) return;
+      const t = document.getElementById(a.getAttribute('href').slice(1));
+      if (!t) return;
+      e.preventDefault();
+      for (let el = t; el; el = el.parentElement)
+        if (el.tagName === 'DETAILS' && !el.open) { el.open = true; if (el.dataset.ui) uiOpen[el.dataset.ui] = true; }
+      // 不用 scrollIntoView：實測會出現「目標位置＋當前捲動量」的加法異常，
+      // 自己算絕對位置最可靠（扣掉 sticky 快速列的高度）
+      const nav = $('.daynav');
+      const off = (nav ? nav.offsetHeight : 0) + 12;
+      window.scrollTo(0, Math.max(0, t.getBoundingClientRect().top + window.scrollY - off));
+    }, true);
     $('#result-inner').addEventListener('click', e => {
       if (e.target.closest('#resetPins')) { state.pins = {}; state.stPins = {}; state.ord = {}; state.at = {}; state.dayCl = null; reflow('已還原成系統自動安排'); return; }
       const da = e.target.closest('[data-dayauto]');
