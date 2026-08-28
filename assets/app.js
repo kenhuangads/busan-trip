@@ -628,11 +628,14 @@
       const hotelRow = day.tl.filter(r => r.k === 'hotel').pop();
       const back = hotelRow ? hotelRow.t : null;
       if (back == null || back <= limit || !day.seq.length) break;
-      // 手動排序的天：使用者的順序說了算，超時只提醒、不擅自刪停靠點
-      if (day.manualOrd) { day.curfewSoft = true; break; }
+      // 手動排序的天：只保護「使用者親手排過的那些站」（ord 清單內）；
+      // 之後才自動塞進來的站（例如晚開門西面店的自動分流）照常受門禁修剪，
+      // 否則按一下 ▲▼ 會讓原本被剪掉的站全部湧回、行程排到半夜
+      const ordProtect = day.manualOrd ? new Set(state.ord[day._i] || []) : null;
 
       // 移除優先序：散步錨點 → 自動補位 → 順路採購 → 自己勾的項目 → 最後採購（最後才動）
       const rank = st => {
+        if (ordProtect && ordProtect.has(stopKey(st))) return 6;       // 使用者手動排過的站不動
         if (st.type === 'cell' && st.cell && st.cell.pinned) return 6; // 手動指定的最後才動
         if (st.type === 'store' && st.pinnedStore) return 6;           // 手動指定日期的採購站同樣受保護
         if (st.type === 'd5shop') return 5;
@@ -652,10 +655,16 @@
         }
       });
       if (si < 0) break;
+      // 只剩受保護的站（手動排序／手動指定）可砍 → 尊重使用者的安排，僅標示超時
+      if (best >= 6) { day.curfewSoft = true; break; }
       // 只剩自己勾的項目或正餐可砍、又只超時一點點 → 寧可晚幾分鐘回飯店，也不要犧牲重點行程或整天沒好好吃飯
       if (best >= 3 && back <= limit + 30) { day.curfewSoft = true; break; }
       const [removed] = day.seq.splice(si, 1);
       (day.trimmed = day.trimmed || []).push(removed);
+      if (removed.type === 'store') {
+        (day.trimmedStores = day.trimmedStores || []).push(removed.store.name);
+        removed.trimmedOut = true;   // 供採購清單 hint 判斷（removed 就是門市群組物件）
+      }
       if (removed.type === 'cell' && removed.cell) {
         if (removed.cell.item && !removed.cell.suggest) day.backup.push(removed.cell.item);
         if (removed.slotKey) {
@@ -1177,6 +1186,7 @@
       if (g.storeId === 'cvs') hint = '隨時順手買｜' + g.store.name;
       else if (g.closedDay) hint = `⚠️ 這趟排不到（該店在對應行程日公休）｜${g.store.name}`;
       else if (di >= 0) hint = `Day ${di + 1} ${g.pinnedStore ? '手動指定採買' : '順路採買'}｜${g.store.name}`;
+      else if (g.trimmedOut) hint = `⚠️ 對應日塞不下（已被回飯店門禁擠掉），想買請改指定別天｜${g.store.name}`;
       else if (cl === 'seomyeon' && (g.store.open || 0) >= 660) hint = 'Day 1 下午順路採買（該店中午後才開門）｜' + g.store.name;
       else if (cl === 'seomyeon') hint = 'Day 5 上午集中採買（可提前 Day 1 傍晚）｜' + g.store.name;
       else hint = `⚠️ 時間排不進行程，想買要自行安排｜${g.store.name}`;
@@ -1827,6 +1837,8 @@
       const heavy = (d.transMins || 0) >= 150;
       const transTip = d.seq && d.seq.length ? `<div class="tip${heavy ? ' holiday' : ''}">🧭 本日交通：${modeBits.join('＋') || '皆在步行圈'}｜<b>總移動約${durTxt(d.transMins || 0)}、${(d.transKm || 0).toFixed(1)}公里</b>｜交通費預估 ${money(d.transCost || 0)}（2人合計）${heavy && d.hog ? `——<b>其中「${esc(d.hog.name)}」最花時間</b>：把它移到別天（用下方項目的「調整」列）可省下約 ${durTxt(d.hog.save)} 車程、少繞 ${d.hog.km.toFixed(1)} 公里` : heavy ? '——移動偏多，可考慮把最遠的一站換成同區其他選擇' : ''}。${d.curfew ? `本日目標 ${fmtT(d.curfew)} 前回到飯店${d.farDay ? '（有遠程景點，已放寬）' : ''}。` : ''}時間為保守估算（含候車與緩衝）。</div>` : '';
       const squeezeTip = d.squeeze ? `<div class="tip holiday">⚠️ 離場前時間較緊：建議把部分採買或用餐提前，或改到機場解決。</div>` : '';
+      const ordTip = state.ord[i] ? `<div class="tip">🔒 <b>本日順序已手動固定</b>——系統只重算時間與交通，不會重排你定的先後；晚開門店家自動分流等「新加入的站」若塞不下仍會退回採購清單。<button class="ed" data-dayauto="${i}" style="margin-left:6px">↩ 這天改回自動排序</button></div>` : '';
+      const trimTip = (d.trimmedStores && d.trimmedStores.length) ? `<div class="tip holiday">⏱ 這天塞不下 ${d.trimmedStores.length} 間門市：<b>${d.trimmedStores.map(x => esc(x)).join('、')}</b>——已退回下方採購清單（顯示「時間排不進行程」），想逛可用清單裡的「安排到 Day N」指定到別天。</div>` : '';
       const pinClosedTip = (d.pinnedClosed && d.pinnedClosed.length) ? `<div class="tip holiday">📌 你手動把 ${d.pinnedClosed.map(x => esc(x.name)).join('、')} 排在這天，但它<b>週${DOW_TXT[d.dow]}公休</b>——行程照你的安排保留，出發前請再確認。</div>` : '';
       const closedTip = (d.closedShops && d.closedShops.length) ? `<div class="tip holiday">🚫 ${d.closedShops.map(g => esc(g.store.name)).join('、')}<b>本日（週${DOW_TXT[d.dow]}）公休</b>——${d.closedShops.map(g => g.items.map(i => esc(i.name)).join('、')).join('；')} 買不到。${d.full ? '可用右上角「🔄 換天」把這天和別天整個對調，避開公休日；' : ''}或另外找地方買，出發前先確認營業狀況。</div>` : '';
       const mealTip = (d.noLunch || d.noDinner) ? `<div class="tip holiday">🍽️ 這天${d.noLunch && d.noDinner ? '中午與晚上都' : d.noLunch ? '中午' : '晚上'}沒有安排用餐——${d.noLunch && !d.noDinner ? '上午的行程較滿，記得在景點附近先墊個東西' : '建議從下面的同區備選挑一家，或在附近隨機找一家'}。</div>` : '';
@@ -1841,7 +1853,7 @@
         </header>
         ${dayTips[d.key] ? `<div class="tip holiday">${esc(dayTips[d.key])}</div>` : ''}
         <div class="tip">🚇 ${esc(TRANSIT[d.cluster])}</div>
-        ${transTip}${squeezeTip}${pinClosedTip}${closedTip}${mealTip}${lunchTip}
+        ${transTip}${squeezeTip}${ordTip}${trimTip}${pinClosedTip}${closedTip}${mealTip}${lunchTip}
         ${routeMapHtml(d)}
         <div class="timeline">${rows}</div>
         ${backup}
@@ -2275,6 +2287,12 @@
   function bindResultEvents() {
     $('#result-inner').addEventListener('click', e => {
       if (e.target.closest('#resetPins')) { state.pins = {}; state.stPins = {}; state.ord = {}; state.at = {}; state.dayCl = null; reflow('已還原成系統自動安排'); return; }
+      const da = e.target.closest('[data-dayauto]');
+      if (da) {
+        delete state.ord[+da.dataset.dayauto];
+        reflow(`Day ${+da.dataset.dayauto + 1} 已改回自動排序，路線重新最佳化`);
+        return;
+      }
       /* ▲▼ 本日排序：以當天實際停靠序列為底，交換相鄰兩站後存成該天的手動順序 */
       const ro = e.target.closest('[data-ro]');
       if (ro) {
