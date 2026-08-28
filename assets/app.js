@@ -521,7 +521,7 @@
           day.overflow = true;
         } else if (st.type === 'store') {
           st.trimmedOut = true;
-          (day.trimmedStores = day.trimmedStores || []).push(st.store.name);
+          (day.trimmedStores = day.trimmedStores || []).push(st);
         } else day.seq.push(st);
       });
       return;
@@ -556,7 +556,7 @@
       } else if (st.type === 'store') {
         // 塞不進營業時間就不要排——擺一個已打烊的時間毫無意義
         st.trimmedOut = true;
-        (day.trimmedStores = day.trimmedStores || []).push(st.store.name);
+        (day.trimmedStores = day.trimmedStores || []).push(st);
       } else if (st.type === 'd5shop') {
         day.seq.push(st);
       }
@@ -673,7 +673,7 @@
       const [removed] = day.seq.splice(si, 1);
       (day.trimmed = day.trimmed || []).push(removed);
       if (removed.type === 'store') {
-        (day.trimmedStores = day.trimmedStores || []).push(removed.store.name);
+        (day.trimmedStores = day.trimmedStores || []).push(removed);
         removed.trimmedOut = true;   // 供採購清單 hint 判斷（removed 就是門市群組物件）
       }
       if (removed.type === 'cell' && removed.cell) {
@@ -1203,6 +1203,7 @@
 
     /* 採購清單分組（依門市 → 對應日提示） */
     const shopGroups = {};
+    const unplacedStores = [];
     // 這個門市實際被排進哪一天？（沒排進去就別謊稱順路）
     const placedDayOf = g => {
       const i = days.findIndex(d => (d.seq || []).some(st => st === g) ||
@@ -1223,6 +1224,10 @@
       else if (cl === 'seomyeon') hint = 'Day 5 上午集中採買（可提前 Day 1 傍晚）｜' + g.store.name;
       else hint = `⚠️ 時間排不進行程，想買要自行安排｜${g.store.name}`;
       shopGroups[hint] = { store: g.store, storeId: g.storeId, pinned: !!g.pinnedStore, items: g.items };
+      // 排不進行程的門市另外收集，結果頁頂部集中呈現（不用拉到最下面一個一個找）
+      if (g.storeId !== 'cvs' && di < 0)
+        unplacedStores.push({ storeId: g.storeId, store: g.store, items: g.items,
+          reason: hint.split('｜')[0], pinned: !!g.pinnedStore });
     });
 
     /* 費用估算 */
@@ -1231,7 +1236,7 @@
     let shopCost = 0;
     shops.forEach(it => { shopCost += it.est || 0; });
 
-    return { days, shopGroups, cost, shopCost, transTotal, sel, spots, foods, shops };
+    return { days, shopGroups, unplacedStores, cost, shopCost, transTotal, sel, spots, foods, shops };
   }
 
   /* ============================================================
@@ -1838,11 +1843,43 @@
       <span class="ver-hint">每次產生行程自動存一版（此裝置保留最近 10 版）；點版本即切換採用，行程與試算表同步都會用該版本。</span></div>`;
   }
 
+  /* 排不進行程的門市 → 結果頁頂部集中面板：原因、想買清單、就地改排 */
+  function unplacedHtml(plan) {
+    const unp = plan.unplacedStores || [];
+    if (!unp.length) return '';
+    const DOWS = ['日', '一', '二', '三', '四', '五', '六'];
+    const cards = unp.map(u => {
+      const st = u.store;
+      const hours = (st.open != null || st.close != null)
+        ? `⏰ ${st.open != null ? fmtT(st.open) : '?'}–${st.close != null ? fmtT(st.close) : '?'}${st.closedDow && st.closedDow.length ? '・週' + st.closedDow.map(d => DOWS[d]).join('') + '休' : ''}`
+        : '';
+      const pin = state.stPins[u.storeId];
+      const names = u.items.slice(0, 3).map(it => esc(it.name)).join('、') +
+        (u.items.length > 3 ? ` …等 ${u.items.length} 項` : '');
+      return `<div class="unp-card" id="unp-${u.storeId}">
+        <div class="unp-name">🛍️ ${esc(st.name)} <span class="unp-hours">${hours}</span></div>
+        <div class="unp-why">${esc(u.reason)}</div>
+        <div class="unp-items">想買：${names}</div>
+        <div class="unp-act"><span class="ed-lab">改排到</span>
+          <select class="ed-sel" data-stday="${u.storeId}">
+            <option value=""${!pin ? ' selected' : ''}>系統自動安排</option>
+            ${[0, 1, 2, 3, 4].map(i => `<option value="${i}"${pin && pin.d === i ? ' selected' : ''}>📌 Day ${i + 1}${i === 4 ? '（返程上午）' : ''}</option>`).join('')}
+          </select>
+          <a class="unp-jump" href="#sg-${u.storeId}">↓ 完整品項</a></div>
+      </div>`;
+    }).join('');
+    return `<div class="unp-wrap no-print" id="unpwrap">
+      <div class="unp-head">🛒 <b>${unp.length} 間門市這次排不進行程</b>——原因與想買的東西都在下面，選個日期就直接改排（會立刻重算整份行程）：</div>
+      <div class="unp-list">${cards}</div>
+    </div>`;
+  }
+
   let lastPlan = null;         // 最近一次產生的行程（▲▼ 排序要讀當天的實際停靠序列）
   let fullDayInfo = [];        // 整天對調用：[{ idx:第幾天, cluster:生活圈 }]
   function renderResult(plan) {
     const t = CONFIG.trip;
     const c = counts();
+    const unpHtml = unplacedHtml(plan);
     fullDayInfo = plan.days.map((d, i) => ({ idx: i, cluster: d.cluster })).filter((_, i) => plan.days[i].full);
     const dayHtml = plan.days.map((d, i) => {
       const cl = CLUSTERS[d.cluster];
@@ -1873,7 +1910,7 @@
       const transTip = d.seq && d.seq.length ? `<div class="tip${heavy ? ' holiday' : ''}">🧭 本日交通：${modeBits.join('＋') || '皆在步行圈'}｜<b>總移動約${durTxt(d.transMins || 0)}、${(d.transKm || 0).toFixed(1)}公里</b>｜交通費預估 ${money(d.transCost || 0)}（2人合計）${heavy && d.hog ? `——<b>其中「${esc(d.hog.name)}」最花時間</b>：把它移到別天（用下方項目的「調整」列）可省下約 ${durTxt(d.hog.save)} 車程、少繞 ${d.hog.km.toFixed(1)} 公里` : heavy ? '——移動偏多，可考慮把最遠的一站換成同區其他選擇' : ''}。${d.curfew ? `本日目標 ${fmtT(d.curfew)} 前回到飯店${d.farDay ? '（有遠程景點，已放寬）' : ''}。` : ''}時間為保守估算（含候車與緩衝）。</div>` : '';
       const squeezeTip = d.squeeze ? `<div class="tip holiday">⚠️ 離場前時間較緊：建議把部分採買或用餐提前，或改到機場解決。</div>` : '';
       const ordTip = state.ord[i] ? `<div class="tip">🔒 <b>本日順序已手動固定</b>——系統只重算時間與交通，不會重排你定的先後；晚開門店家自動分流等「新加入的站」若塞不下仍會退回採購清單。<button class="ed" data-dayauto="${i}" style="margin-left:6px">↩ 這天改回自動排序</button></div>` : '';
-      const trimTip = (d.trimmedStores && d.trimmedStores.length) ? `<div class="tip holiday">⏱ 這天塞不下 ${d.trimmedStores.length} 間門市：<b>${d.trimmedStores.map(x => esc(x)).join('、')}</b>——已退回下方採購清單（顯示「時間排不進行程」），想逛可用清單裡的「安排到 Day N」指定到別天。</div>` : '';
+      const trimTip = (d.trimmedStores && d.trimmedStores.length) ? `<div class="tip holiday">⏱ 這天塞不下 ${d.trimmedStores.length} 間門市：${d.trimmedStores.map(x => `<a class="tt-link" href="#unp-${x.storeId}">${esc(x.store.name)}</a>`).join('、')}——<a class="tt-link" href="#unpwrap">到頁面上方的「排不進的門市」面板</a>可直接改排到別天。</div>` : '';
       const pinClosedTip = (d.pinnedClosed && d.pinnedClosed.length) ? `<div class="tip holiday">📌 你手動把 ${d.pinnedClosed.map(x => esc(x.name)).join('、')} 排在這天，但它<b>週${DOW_TXT[d.dow]}公休</b>——行程照你的安排保留，出發前請再確認。</div>` : '';
       const closedTip = (d.closedShops && d.closedShops.length) ? `<div class="tip holiday">🚫 ${d.closedShops.map(g => esc(g.store.name)).join('、')}<b>本日（週${DOW_TXT[d.dow]}）公休</b>——${d.closedShops.map(g => g.items.map(i => esc(i.name)).join('、')).join('；')} 買不到。${d.full ? '可用右上角「🔄 換天」把這天和別天整個對調，避開公休日；' : ''}或另外找地方買，出發前先確認營業狀況。</div>` : '';
       const mealTip = (d.noLunch || d.noDinner) ? `<div class="tip holiday">🍽️ 這天${d.noLunch && d.noDinner ? '中午與晚上都' : d.noLunch ? '中午' : '晚上'}沒有安排用餐——${d.noLunch && !d.noDinner ? '上午的行程較滿，記得在景點附近先墊個東西' : '建議從下面的同區備選挑一家，或在附近隨機找一家'}。</div>` : '';
@@ -1923,7 +1960,7 @@
             : '';
           // 門市備註（省錢撇步、退稅方式、避雷品項…）不該只在「有排進行程」時才看得到
           const note = grp.store && grp.store.note ? `<div class="store-note">💡 ${esc(grp.store.note)}</div>` : '';
-          return `<div class="shop-group"><h3>📍 ${esc(g)}</h3>${note}${dayPick}${grp.items.map(it => {
+          return `<div class="shop-group"${grp.storeId ? ` id="sg-${grp.storeId}"` : ''}><h3>📍 ${esc(g)}</h3>${note}${dayPick}${grp.items.map(it => {
             const ci = catInfo(it);
             const safeTxt = it.safe === 'warn' ? '<span class="badge warn">⚠️ 成分含肉禁帶</span>' :
               it.safe === 'ok-check' ? '<span class="badge note">須託運</span>' : '';
@@ -1951,6 +1988,7 @@
             ${plan.shopCost ? `<div class="sub">🛍️ 購物清單全買約 ${money(plan.shopCost)}</div>` : ''}</div>
         </div>
         <div class="ov-wrap"><b>勾選總覽：</b>${overview}</div>
+        ${unpHtml}
         <div class="ov-wrap edit-hint no-print">✏️ <b>可以手動微調：</b>整天想換日子的話，用 Day 2～4 標題右邊的 <b>🔄 換天</b>——例如按 Day 2 的「↔ Day 3」，兩天的行程就整個對調（同一天的項目一起搬，公休日與交通會重算）。每個停靠點（景點、美食、<b>採購站也一樣</b>）下方都有「調整」列——<b>▲ ▼</b> 直接改當天的先後順序（改完出發抵達時間全部重新試算）、<b>◀ ▶</b> 搬到別天、<b>時段選單</b>改成當天其他時段、<b>✕ 移除</b>拿掉不想去的；Day 5 最終採購裡的每間店還能用下拉選單提前到別天買。改完系統會立刻重排整份行程（交通、用餐時間、回飯店時間都會重新計算），手動指定的會標上 📌 並優先保留、手動排的順序不會被系統推翻。</div>
         ${versionBarHtml()}
         <div class="r-actions no-print">

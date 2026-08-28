@@ -522,3 +522,17 @@ small { color: var(--ink-3); font-weight: 400; }
 .gap-fill .ed.go { background: #fff; border-color: #7fc4a0; color: #1f7a52; }
 .gap-fill .ed.go:hover { background: #1f9d63; border-color: #1f9d63; color: #fff; }
 .gap-fill .ed em { font-style: normal; opacity: .7; margin-left: 4px; font-size: 10.5px; }
+
+/* ── v7：排不進行程的門市（頂部集中面板） ── */
+.unp-wrap { margin: 10px 0; padding: 11px 13px; background: #fff8ec; border: 1px solid #f0d9a8; border-left: 5px solid #e8a13a; border-radius: 12px; scroll-margin-top: 12px; }
+.unp-head { font-size: 13.5px; color: #7a5410; margin-bottom: 8px; }
+.unp-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+.unp-card { background: #fff; border: 1px solid #eadfc4; border-radius: 10px; padding: 9px 11px; scroll-margin-top: 12px; }
+.unp-name { font-size: 14px; font-weight: 700; color: var(--ink); }
+.unp-hours { font-size: 11.5px; font-weight: 400; color: #8a94a2; margin-left: 4px; white-space: nowrap; }
+.unp-why { font-size: 12.3px; color: #a3610e; margin-top: 3px; }
+.unp-items { font-size: 12.3px; color: var(--ink-3); margin-top: 3px; }
+.unp-act { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 7px; padding-top: 7px; border-top: 1px dashed #eee3ca; }
+.unp-jump { font-size: 12px; color: var(--ocean); white-space: nowrap; }
+.tt-link { color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.shop-group { scroll-margin-top: 12px; }
