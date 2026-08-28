@@ -383,7 +383,7 @@
     afternoon: 1050, pmstroll: 1050,
     cafe: 1110, pmcafe: 1140, sweet: 1200,
     evening: 1230, dinner: 1230, d1dinner: 1260,
-    night: 1320, d1night: 1320
+    night: 1320, d1night: 1350
   };
   const DOW_TXT = ['日','一','二','三','四','五','六'];
   // 這家店在這天有開嗎？（closedDow: 0=週日 … 6=週六）
@@ -519,6 +519,9 @@
           if (st.slotKey) day.slots[st.slotKey] = null;
           (day.trimmed = day.trimmed || []).push(st);
           day.overflow = true;
+        } else if (st.type === 'store') {
+          st.trimmedOut = true;
+          (day.trimmedStores = day.trimmedStores || []).push(st.store.name);
         } else day.seq.push(st);
       });
       return;
@@ -550,8 +553,12 @@
         if (st.slotKey) day.slots[st.slotKey] = null;
         (day.trimmed = day.trimmed || []).push(st);
         day.overflow = true;
-      } else if (st.type === 'store' || st.type === 'd5shop') {
-        day.seq.push(st); // 採購站沒有時段包袱，仍放進當天由門禁決定去留
+      } else if (st.type === 'store') {
+        // 塞不進營業時間就不要排——擺一個已打烊的時間毫無意義
+        st.trimmedOut = true;
+        (day.trimmedStores = day.trimmedStores || []).push(st.store.name);
+      } else if (st.type === 'd5shop') {
+        day.seq.push(st);
       }
     });
   }
@@ -572,29 +579,33 @@
       geo.push({ i, det: havKm(A, S) + havKm(S, B) - havKm(A, B) });
     }
     geo.sort((a, b) => a.det - b.det);
-    const TRY_TOP = 8;
-    const cand = [];
-    for (const g of geo.slice(0, TRY_TOP)) {
+    const evalPos = g => {
       const seq2 = seq.slice();
       seq2.splice(g.i + 1, 0, stop);
       const tmp = { key: day.key, cluster: day.cluster, seq: seq2 };
       computeTimeline(tmp);
       const row = tmp.tl.find(r => (r.k === 'store' && r.g === stop) ||
         (r.k === 'item' && stop.cell && r.cell === stop.cell));
-      if (!row) continue;
+      if (!row) return null;
       const hr = tmp.tl.filter(x => x.k === 'hotel').pop();
-      cand.push({ i: g.i, det: g.det, start: row.t, end: row.end,
+      return { i: g.i, det: g.det, start: row.t, end: row.end,
         meals: timingOk(tmp.tl), back: hr ? hr.t : 0,
-        wait: (row.batch && row.batch.wait) || 0 });   // 要乾等出爐的位置要扣分
-    }
-    if (!cand.length) return false;
+        wait: (row.batch && row.batch.wait) || 0 };   // 要乾等出爐的位置要扣分
+    };
+    const TRY_TOP = 8;
+    const cand = geo.slice(0, TRY_TOP).map(evalPos).filter(Boolean);
     const CLOSE_BUF = 15;                          // 打烊前留 15 分鐘結帳離場
-    const ok = cand.filter(c =>
-      c.meals &&                                   // 不能把任何行程擠出它該有的時段
+    const hoursOk = c =>
       (closeMin == null || c.end <= closeMin - CLOSE_BUF) &&
-      (openMin == null || c.start >= openMin) &&
-      c.start <= 1230);
-    if (!ok.length) return false;                  // 這天排不進合理時段 → 交給呼叫端列為備選
+      (openMin == null || c.start >= openMin);
+    let ok = cand.filter(c => c.meals && hoursOk(c) && c.start <= 1230);
+    // 門市的放寬輪：與其被丟到打烊後的死時間，不如掃「全部」位置、
+    // 拿掉 20:30 上限（營業時間硬條件仍在），找出真正逛得到的排法
+    if (!ok.length && store) {
+      const all = geo.map(evalPos).filter(Boolean);
+      ok = all.filter(c => c.meals && hoursOk(c));
+    }
+    if (!ok.length) return false;                  // 這天真的塞不進營業時間 → 交給呼叫端誠實移出
     // 先看有沒有「能準時回飯店」的排法，有的話只在這些位置裡比繞路
     const CFL = day.key === 'd5' ? 740 : (day.curfewLimit || (CONFIG.curfew || {}).normal || 1290);
     const inTime = ok.filter(c => c.back && c.back <= CFL);
@@ -962,18 +973,6 @@
       suggest(d5, 'd5lunch', f => f.zone === 'seomyeon' || f.zone === 'jeonpo');
     }
 
-    /* 下午與傍晚皆空 → 插入免費散步錨點，避免行程出現大空窗 */
-    days.forEach(d => {
-      const a = ANCHORS[d.cluster];
-      if (!a) return;
-      if (d.full) {
-        if (!d.slots.afternoon && !d.slots.evening) d.slots.afternoon = { anchor: a };
-      } else if (d.key === 'd1' && !d.slots.pmstroll) {
-        d.slots.pmstroll = { anchor: a };
-      }
-    });
-
-    /* ── 購物 → 具體門市 → 排入行程 ── */
     const byStore = {};
     shops.forEach(it => {
       if (!it._store) return;
@@ -992,6 +991,27 @@
     const otherGroups = storeGroups.filter(g => g !== cvsGroup && !pinnedEarly.includes(g) && !smGroups.includes(g));
     const pinnedD5Other = otherGroups.filter(g => stPinOf(g) === 4);
     const autoOther = otherGroups.filter(g => stPinOf(g) == null);
+
+    /* 這天預計會有幾個採購站？（散步錨點要不要讓位就看這個） */
+    const storeLoad = i => pinnedEarly.filter(g => stPinOf(g) === i).length +
+      (i === 0 ? smGroups.filter(g => (g.store.open || 0) >= 660 && stPinOf(g) !== 4).length : 0) +
+      autoOther.filter(g => days[i] && days[i].full && ZONES[g.store.zone].cluster === days[i].cluster).length;
+
+    /* 下午與傍晚皆空 → 插入免費散步錨點，避免行程出現大空窗。
+       但購物量大（≥2 站）的日子不插：填充散步佔掉的 60 分鐘，
+       會把使用者真正指定的店擠到營業時間外 */
+    days.forEach((d, di) => {
+      const a = ANCHORS[d.cluster];
+      if (!a) return;
+      if (storeLoad(di) >= 2) return;
+      if (d.full) {
+        if (!d.slots.afternoon && !d.slots.evening) d.slots.afternoon = { anchor: a };
+      } else if (d.key === 'd1' && !d.slots.pmstroll) {
+        d.slots.pmstroll = { anchor: a };
+      }
+    });
+
+    /* ── 購物 → 具體門市 → 排入行程 ── */
 
     /* 每日停靠序列（不含 d5shop 佔位，稍後客製） */
     days.forEach(d => {
@@ -1197,7 +1217,8 @@
       if (g.storeId === 'cvs') hint = '隨時順手買｜' + g.store.name;
       else if (g.closedDay) hint = `⚠️ 這趟排不到（該店在對應行程日公休）｜${g.store.name}`;
       else if (di >= 0) hint = `Day ${di + 1} ${g.pinnedStore ? '手動指定採買' : '順路採買'}｜${g.store.name}`;
-      else if (g.trimmedOut) hint = `⚠️ 對應日塞不下（已被回飯店門禁擠掉），想買請改指定別天｜${g.store.name}`;
+      else if (g.trimmedOut && g.pinnedStore) hint = `⚠️ 你指定的 Day ${((state.stPins[g.storeId] || {}).d || 0) + 1} 塞不進這間店的營業時間，請改指定別天｜${g.store.name}`;
+      else if (g.trimmedOut) hint = `⚠️ 對應日塞不下（營業時間或回飯店門禁排不進去），想買請改指定別天｜${g.store.name}`;
       else if (cl === 'seomyeon' && (g.store.open || 0) >= 660) hint = 'Day 1 下午順路採買（該店中午後才開門）｜' + g.store.name;
       else if (cl === 'seomyeon') hint = 'Day 5 上午集中採買（可提前 Day 1 傍晚）｜' + g.store.name;
       else hint = `⚠️ 時間排不進行程，想買要自行安排｜${g.store.name}`;
