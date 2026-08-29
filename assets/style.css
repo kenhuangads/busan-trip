@@ -391,6 +391,11 @@ small { color: var(--ink-3); font-weight: 400; }
 .ed-time:focus { outline: none; border-color: var(--ocean); }
 .links a.bk { background: #fff1e8; border-color: #f0c9ad; color: #b4541b; font-weight: 700; }
 .links a.bk:hover { background: #ffe4d2; border-color: #e08a4e; }
+.links a.bk.nbk { background: #e8f4ec; border-color: #a9d5bd; color: #1f6e43; }
+.links a.bk.nbk:hover { background: #d6ecdf; border-color: #57ab84; }
+/* 人數門檻高於同行人數：淡化，避免看起來可用 */
+.links a.bk.nbk.dim { background: #f3f5f4; border-color: #d8dedb; color: #7b8a83; font-weight: 500; }
+.links a.bk.nbk.dim:hover { background: #eaeeec; border-color: #b6c2bc; color: #566159; }
 /* ── v6：出爐／場次提醒 ── */
 .batchbox { margin-top: 7px; padding: 7px 11px; border-radius: 10px; font-size: 12.8px; line-height: 1.75; }
 .batchbox.ok { background: #e9f7ef; border: 1px solid #bfe3cd; color: #1f6e43; }

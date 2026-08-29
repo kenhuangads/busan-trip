@@ -41,6 +41,10 @@
   // 點連結會自動開 App 到該店頁面；沒裝則開繁中網頁版（Google/Apple 帳號可訂位，免韓國門號）
   const ctShop = s => 'https://www.catchtable.net/zh-TW/shop/' + s;
   const tabling = q => 'https://www.tabling.co.kr/search?keyword=' + encodeURIComponent(q);
+  // NAVER 예약：可指定「未來日期＋時段」訂位（不是當日候位）。
+  // 2026/6/4 起 NAVER 開放護照認證，沒有韓國門號的短期旅客也能訂位與線上付款。
+  // businessTypeId 一律走 6（餐廳類）；手機點了會自動開 NAVER App 的預約頁。
+  const nbook = id => 'https://m.booking.naver.com/booking/6/bizes/' + id;
   const money = n => 'NT$' + Number(n).toLocaleString('en-US');
   const ceil5 = m => Math.ceil(m / 5) * 5;
   const fmtT = m => {
@@ -131,6 +135,14 @@
     if (links.ctS) a.push(`<a class="bk" href="${ctShop(links.ctS)}" target="_blank" rel="noopener">🍽 CatchTable ${links.ctBook ? '訂位／候位' : '線上候位'}・App直達</a>`);
     else if (links.ct) a.push(`<a class="bk" href="${ctable(links.ct)}" target="_blank" rel="noopener">🍽 CatchTable ${links.ctBook ? '訂位／候位' : '線上候位'}</a>`);
     if (links.tb) a.push(`<a class="bk" href="${tabling(links.tb)}" target="_blank" rel="noopener">⏳ Tabling 候位</a>`);
+    // NAVER 예약＝唯一能「提前指定日期」的管道（CatchTable／Tabling 多為當日候位）。
+    // 人數門檻（nbMin）高於同行人數時淡化顯示——兩人同行按了也訂不到，別讓按鈕看起來可用。
+    if (links.nb) {
+      const few = links.nbMin && links.nbMin > CONFIG.people;
+      const win = links.nbWin ? `｜只能提前 ${links.nbWin} 天訂` : '';
+      const tip = `NAVER 예약：可指定未來日期與時段訂位${win}${links.nbNote ? '｜' + links.nbNote : ''}。免預約金；2026/6 起支援護照認證，沒有韓國門號也能訂`;
+      a.push(`<a class="bk nbk${few ? ' dim' : ''}" href="${nbook(links.nb)}" target="_blank" rel="noopener" title="${esc(tip)}">📅 NAVER 訂位${few ? `（${links.nbMin}人起）` : '・可選日期'}</a>`);
+    }
     if (imgQuery) a.push(`<a href="${gimg(imgQuery)}" target="_blank" rel="noopener">📷 實景圖片</a>`);
     // 有 NAVER 店家 id → 手機點了直接開 App 到「那一家」的頁面（沒裝 App 則開網頁版）
     if (links.nid) a.push(nvLink('place', links.nid, '🗺️ NAVER・App直達'));
