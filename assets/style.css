@@ -434,6 +434,8 @@ small { color: var(--ink-3); font-weight: 400; }
 .links a.nv { background: #eef4ff; border: 1px solid #c3d6f5; border-radius: 999px; padding: 1px 10px; font-weight: 700; color: #23509b; }
 .links a.nv:hover { background: #dde9ff; border-color: #8fb3ea; text-decoration: none; }
 @media print { .telbtn { border: none; padding: 0; } .telbtn em { display: none; } }
+.badge.hol.closed { background: #fdeaea; color: #8c2f2f; border: 1px solid #f0bcbc; }
+.badge.hol.open { background: #e9f7ef; color: #1f6e43; border: 1px solid #bfe3cd; }
 .badge.pin { background: #e8f0ff; color: #2b5fa8; border: 1px solid #b9cef0; }
 .r-actions button.rst { background: var(--sun); color: #4a3200; }
 @media print { .e-edit { display: none !important; } }

@@ -399,8 +399,39 @@
   };
   const DOW_TXT = ['日','一','二','三','四','五','六'];
   // 這家店在這天有開嗎？（closedDow: 0=週日 … 6=週六）
-  const openOnDay = (o, day) =>
-    !(o && o.closedDow && day && day.dow != null && o.closedDow.indexOf(day.dow) >= 0);
+  const openOnDay = (o, day) => {
+    if (!o || !day) return true;
+    if (o.closedDow && day.dow != null && o.closedDow.indexOf(day.dow) >= 0) return false;
+    if (o.closedDates && day.md && o.closedDates.indexOf(day.md) >= 0) return false;  // 中秋等特定日期公休
+    return true;
+  };
+  // 這天為什麼不營業（給提示文字用）
+  const closedWhy = (o, day) => {
+    if (o && o.closedDates && day && day.md && o.closedDates.indexOf(day.md) >= 0) return `${day.md} 中秋連假公休`;
+    return `週${DOW_TXT[day.dow]}公休`;
+  };
+  // 中秋連假日期（行程只有 Day1 9/26 落在連假內）
+  const HOL_MD = (CONFIG.holidayDates || ['9/24', '9/25', '9/26']);
+  const isHolDay = day => !!(day && day.md && HOL_MD.indexOf(day.md) >= 0);
+  // 店家在「這個連假日」的狀態：closed / open（已公告營業或公告的休日不含這天）/ unknown（未公告）
+  const holStatus = (o, day) => {
+    if (!o) return 'unknown';
+    if (o.closedDates && day && day.md && o.closedDates.indexOf(day.md) >= 0) return 'closed';
+    if (o.hol === 'open') return 'open';
+    if (o.closedDates && o.closedDates.length) return 'open';   // 有公告休日、但不含這天 → 視為營業
+    if ((o.tag || '').includes('24hr')) return 'open';
+    return 'unknown';
+  };
+  const holBadge = it => {
+    const ex = it.holExpected ? '（預期）' : '';
+    const hd = (it.closedDates || []).filter(x => HOL_MD.indexOf(x) >= 0);   // 只標連假內的休日（9/28 例休不算）
+    if (hd.length) return `<span class="badge hol ${hd.indexOf('9/26') >= 0 ? 'closed' : 'open'}" title="${esc(it.holNote || '')}">🌕 中秋休 ${esc(hd.join('・'))}${ex}</span>`;
+    if (it.hol === 'open') return `<span class="badge hol open" title="${esc(it.holNote || '')}">🌕 中秋營業${ex}</span>`;
+    const sd = it._store ? (it._store.closedDates || []).filter(x => HOL_MD.indexOf(x) >= 0) : [];
+    if (sd.length) return `<span class="badge hol ${sd.indexOf('9/26') >= 0 ? 'closed' : 'open'}" title="${esc(it._store.holNote || '')}">🌕 門市中秋休 ${esc(sd.join('・'))}${it._store.holExpected ? '（預期）' : ''}</span>`;
+    if (it._store && it._store.hol === 'open') return `<span class="badge hol open" title="${esc(it._store.holNote || '')}">🌕 門市中秋營業${it._store.holExpected ? '（預期）' : ''}</span>`;
+    return '';
+  };
 
   // 正餐＝會吃飽的一頓（咖啡／甜點／小吃不算），用來檢查兩餐間隔
   const isRealMeal = it => it && it.kind === 'food' &&
@@ -461,15 +492,15 @@
 
   function makeDays() {
     return [
-      { key: 'd1', date: '9/26（六）', dow: 6, full: false, cluster: 'seomyeon', theme: '抵達釜山・西面暖身',
+      { key: 'd1', md: '9/26', date: '9/26（六）', dow: 6, full: false, cluster: 'seomyeon', theme: '抵達釜山・西面暖身',
         slotKeys: ['latelunch', 'pmstroll', 'pmcafe', 'd1dinner', 'd1night'] },
-      { key: 'd2', date: '9/27（日）', dow: 0, full: true, cluster: 'east', theme: '海岸線一日',
+      { key: 'd2', md: '9/27', date: '9/27（日）', dow: 0, full: true, cluster: 'east', theme: '海岸線一日',
         slotKeys: ['brunch', 'morning', 'lunch', 'afternoon', 'cafe', 'sweet', 'evening', 'dinner', 'night'] },
-      { key: 'd3', date: '9/28（一）', dow: 1, full: true, cluster: 'gwangalli', theme: '海景與夜色',
+      { key: 'd3', md: '9/28', date: '9/28（一）', dow: 1, full: true, cluster: 'gwangalli', theme: '海景與夜色',
         slotKeys: ['brunch', 'morning', 'lunch', 'afternoon', 'cafe', 'sweet', 'evening', 'dinner', 'night'] },
-      { key: 'd4', date: '9/29（二）', dow: 2, full: true, cluster: 'nampo', theme: '舊城文化散策',
+      { key: 'd4', md: '9/29', date: '9/29（二）', dow: 2, full: true, cluster: 'nampo', theme: '舊城文化散策',
         slotKeys: ['brunch', 'morning', 'lunch', 'afternoon', 'cafe', 'sweet', 'evening', 'dinner', 'night'] },
-      { key: 'd5', date: '9/30（三）', dow: 3, full: false, cluster: 'seomyeon', theme: '西面最終採購・返程',
+      { key: 'd5', md: '9/30', date: '9/30（三）', dow: 3, full: false, cluster: 'seomyeon', theme: '西面最終採購・返程',
         slotKeys: ['d5brunch', 'd5shop', 'd5lunch'] }
     ];
   }
@@ -976,9 +1007,9 @@
       };
       const d1 = days[0], d5 = days[4];
       // Day1 逢中秋連假 → 優先 24hr 店
-      suggest(d1, 'latelunch', f => (f.tag || '').includes('24hr'));
+      suggest(d1, 'latelunch', f => f.hol === 'open' || (f.tag || '').includes('24hr'));
       suggest(d1, 'latelunch');
-      suggest(d1, 'd1dinner', f => (f.tag || '').includes('24hr'));
+      suggest(d1, 'd1dinner', f => f.hol === 'open' || (f.tag || '').includes('24hr'));
       suggest(d1, 'd1dinner');
       days.filter(d => d.full).forEach(d => { suggest(d, 'lunch'); suggest(d, 'dinner'); });
       // Day5 趕飛機：只推薦西面步行圈的午餐
@@ -1056,7 +1087,7 @@
       const day = days[stPinOf(g)];
       g.pinnedStore = true;
       day.seq.push(g);
-      if (!openOnDay(g.store, day)) day.pinnedClosed = (day.pinnedClosed || []).concat({ name: g.store.name });
+      if (!openOnDay(g.store, day)) day.pinnedClosed = (day.pinnedClosed || []).concat(g.store);
     });
 
     /* Day 5：西面最終採購（客製列出門市與品項） */
@@ -1180,7 +1211,7 @@
       d.seq.forEach((st, i) => {
         if (st.type === 'd5shop') return;
         const seq2 = d.seq.slice(); seq2.splice(i, 1);
-        const tmp = { key: d.key, cluster: d.cluster, seq: seq2, backup: [], slots: d.slots, slotKeys: d.slotKeys, dow: d.dow };
+        const tmp = { key: d.key, cluster: d.cluster, seq: seq2, backup: [], slots: d.slots, slotKeys: d.slotKeys, dow: d.dow, md: d.md };
         computeTimeline(tmp);
         const save = base - (tmp.transMins || 0);
         if (!best || save > best.save) {
@@ -1278,7 +1309,7 @@
       <div class="card-head">
         <span class="badge cluster" style="--c:${cl.color}">${esc(cl.short)}</span>
         <span class="badge cat">${ci.icon} ${esc(ci.label)}</span>
-        ${it.tag ? `<span class="badge tag">${esc(it.tag)}</span>` : ''}
+        ${it.tag ? `<span class="badge tag">${esc(it.tag)}</span>` : ''}${holBadge(it)}
         ${safeBadge}
         <span class="tick">${on ? '✓ 已選' : '＋ 選擇'}</span>
       </div>
@@ -1925,8 +1956,19 @@
       const squeezeTip = d.squeeze ? `<div class="tip holiday">⚠️ 離場前時間較緊：建議把部分採買或用餐提前，或改到機場解決。</div>` : '';
       const ordTip = state.ord[i] ? `<div class="tip">🔒 <b>本日順序已手動固定</b>——系統只重算時間與交通，不會重排你定的先後；晚開門店家自動分流等「新加入的站」若塞不下仍會退回採購清單。<button class="ed" data-dayauto="${i}" style="margin-left:6px">↩ 這天改回自動排序</button></div>` : '';
       const trimTip = (d.trimmedStores && d.trimmedStores.length) ? `<div class="tip holiday">⏱ 這天塞不下 ${d.trimmedStores.length} 間門市：${d.trimmedStores.map(x => `<a class="tt-link" href="#unp-${x.storeId}">${esc(x.store.name)}</a>`).join('、')}——<a class="tt-link" href="#unpwrap">到頁面上方的「排不進的門市」面板</a>可直接改排到別天。</div>` : '';
-      const pinClosedTip = (d.pinnedClosed && d.pinnedClosed.length) ? `<div class="tip holiday">📌 你手動把 ${d.pinnedClosed.map(x => esc(x.name)).join('、')} 排在這天，但它<b>週${DOW_TXT[d.dow]}公休</b>——行程照你的安排保留，出發前請再確認。</div>` : '';
-      const closedTip = (d.closedShops && d.closedShops.length) ? `<div class="tip holiday">🚫 ${d.closedShops.map(g => esc(g.store.name)).join('、')}<b>本日（週${DOW_TXT[d.dow]}）公休</b>——${d.closedShops.map(g => g.items.map(i => esc(i.name)).join('、')).join('；')} 買不到。${d.full ? '可用右上角「🔄 換天」把這天和別天整個對調，避開公休日；' : ''}或另外找地方買，出發前先確認營業狀況。</div>` : '';
+      const pinClosedTip = (d.pinnedClosed && d.pinnedClosed.length) ? `<div class="tip holiday">📌 你手動把 ${d.pinnedClosed.map(x => esc(x.name)).join('、')} 排在這天，但它<b>${esc(closedWhy(d.pinnedClosed[0], d))}</b>——行程照你的安排保留，出發前請再確認。</div>` : '';
+      let holTip = '';
+      if (isHolDay(d) && d.seq && d.seq.length) {
+        const objs = [];
+        d.seq.forEach(st => {
+          if (st.type === 'cell' && st.cell && st.cell.item) objs.push(st.cell.item);
+          else if (st.type === 'store' && st.store) objs.push(st.store);
+        });
+        const open = objs.filter(o => holStatus(o, d) === 'open').map(o => esc(o.name));
+        const unk = objs.filter(o => holStatus(o, d) === 'unknown').map(o => esc(o.name));
+        holTip = `<div class="tip holiday">🌕 <b>${d.md} 是中秋連假最後一天</b>——已依各店在 NAVER 的公告與訂位班表把連假公休的店排除。${open.length ? `✅ 已確認這天營業：${open.join('、')}。` : ''}${unk.length ? `❓ 尚未公告：${unk.join('、')}——店家通常出發前一週才公告，屆時再查一次；行程已優先選已公告營業與 24 小時的店。` : ''}</div>`;
+      }
+      const closedTip = (d.closedShops && d.closedShops.length) ? `<div class="tip holiday">🚫 ${d.closedShops.map(g => esc(g.store.name)).join('、')}<b>本日${esc(closedWhy(d.closedShops[0].store, d))}</b>——${d.closedShops.map(g => g.items.map(i => esc(i.name)).join('、')).join('；')} 買不到。${d.full ? '可用右上角「🔄 換天」把這天和別天整個對調，避開公休日；' : ''}或另外找地方買，出發前先確認營業狀況。</div>` : '';
       const mealTip = (d.noLunch || d.noDinner) ? `<div class="tip holiday">🍽️ 這天${d.noLunch && d.noDinner ? '中午與晚上都' : d.noLunch ? '中午' : '晚上'}沒有安排用餐——${d.noLunch && !d.noDinner ? '上午的行程較滿，記得在景點附近先墊個東西' : '建議從下面的同區備選挑一家，或在附近隨機找一家'}。</div>` : '';
       const lunchTip = d.lunchDropped ? `<div class="tip">🍜 登機前時間有限，午餐建議外帶輕食或在機場用餐（金海機場餐飲選擇不少）。</div>` : '';
       return `
@@ -1937,7 +1979,7 @@
           ${d.full ? `<div class="day-swap"><span>🔄 換天</span>${fullDayInfo.filter(f => f.idx !== i)
             .map(f => `<button data-swap="${i}|${f.idx}" title="把這天的行程和 Day ${f.idx + 1} 整個對調">↔ Day ${f.idx + 1}<small>${esc(CLUSTERS[f.cluster].short)}</small></button>`).join('')}</div>` : ''}
         </header>
-        ${dayTips[d.key] ? `<div class="tip holiday">${esc(dayTips[d.key])}</div>` : ''}
+        ${dayTips[d.key] ? `<div class="tip holiday">${esc(dayTips[d.key])}</div>` : ''}${holTip}
         <div class="tip">🚇 ${esc(TRANSIT[d.cluster])}</div>
         ${transTip}${squeezeTip}${ordTip}${trimTip}${pinClosedTip}${closedTip}${mealTip}${lunchTip}
         ${routeMapHtml(d)}
