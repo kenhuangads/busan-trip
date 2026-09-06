@@ -1051,13 +1051,15 @@
     };
     const pinnedEarly = storeGroups.filter(g => g !== cvsGroup && stPinOf(g) != null && stPinOf(g) < 4);
     const smGroups = storeGroups.filter(g => g !== cvsGroup && !pinnedEarly.includes(g) && ZONES[g.store.zone].cluster === 'seomyeon');
+    // 西面門市要排 Day 1 下午而不是 Day 5 上午：中午後才開門的選品店、或需要製作時間的店（配鏡 1～3 小時，離場前排不下）
+    const wantD1 = g => (g.store.open || 0) >= 660 || !!g.store.d1;
     const otherGroups = storeGroups.filter(g => g !== cvsGroup && !pinnedEarly.includes(g) && !smGroups.includes(g));
     const pinnedD5Other = otherGroups.filter(g => stPinOf(g) === 4);
     const autoOther = otherGroups.filter(g => stPinOf(g) == null);
 
     /* 這天預計會有幾個採購站？（散步錨點要不要讓位就看這個） */
     const storeLoad = i => pinnedEarly.filter(g => stPinOf(g) === i).length +
-      (i === 0 ? smGroups.filter(g => (g.store.open || 0) >= 660 && stPinOf(g) !== 4).length : 0) +
+      (i === 0 ? smGroups.filter(g => wantD1(g) && stPinOf(g) !== 4).length : 0) +
       autoOther.filter(g => days[i] && days[i].full && ZONES[g.store.zone].cluster === days[i].cluster).length;
 
     /* 下午與傍晚皆空 → 插入免費散步錨點，避免行程出現大空窗。
@@ -1098,7 +1100,7 @@
 
     /* 晚開門的西面選品店（NOCLAIM 12:00、ADER 13:00 等 11:00 後才開的店）
        改排 Day 1 下午～傍晚，不塞進 Day 5 上午的最終採購（會撲空） */
-    const lateSm = smGroups.filter(g => (g.store.open || 0) >= 660 && stPinOf(g) !== 4);
+    const lateSm = smGroups.filter(g => wantD1(g) && stPinOf(g) !== 4);
     const d5Sm = smGroups.filter(g => !lateSm.includes(g));
     lateSm.forEach(g => days[0].seq.push(g));
 
@@ -1283,7 +1285,7 @@
       else if (di >= 0) hint = `Day ${di + 1} ${g.pinnedStore ? '手動指定採買' : '順路採買'}｜${g.store.name}`;
       else if (g.trimmedOut && g.pinnedStore) hint = `⚠️ 你指定的 Day ${((state.stPins[g.storeId] || {}).d || 0) + 1} 塞不進這間店的營業時間，請改指定別天｜${g.store.name}`;
       else if (g.trimmedOut) hint = `⚠️ 對應日塞不下（營業時間或回飯店門禁排不進去），想買請改指定別天｜${g.store.name}`;
-      else if (cl === 'seomyeon' && (g.store.open || 0) >= 660) hint = 'Day 1 下午順路採買（該店中午後才開門）｜' + g.store.name;
+      else if (cl === 'seomyeon' && ((g.store.open || 0) >= 660 || g.store.d1)) hint = `Day 1 下午順路採買（${g.store.d1 ? '需要製作時間，離場前排不下' : '該店中午後才開門'}）｜` + g.store.name;
       else if (cl === 'seomyeon') hint = 'Day 5 上午集中採買（可提前 Day 1 傍晚）｜' + g.store.name;
       else hint = `⚠️ 時間排不進行程，想買要自行安排｜${g.store.name}`;
       shopGroups[hint] = { store: g.store, storeId: g.storeId, pinned: !!g.pinnedStore, items: g.items };
