@@ -150,6 +150,26 @@
     return `<div class="links" onclick="event.stopPropagation()">${a.join('')}</div>`;
   }
   // 圖片搜尋關鍵字：優先用「對準清單品項」的精準韓文商品名，其次店名
+  // 行程裡的採購清單：每個品項是可點的晶片，點了在同一區塊下方展開詳情
+  const piChip = it => `<button type="button" class="pi" data-pi="${esc(it.id)}" title="點一下看價格與商品資訊">☐ ${esc(it.name)}</button>`;
+  const piDetail = it => {
+    const L = it.links || {};
+    const safe = it.safe === 'warn' ? '<span class="badge warn">⚠️ 攜帶回台注意</span>'
+      : it.safe === 'ok-check' ? '<span class="badge note">✅ 可帶・須託運</span>'
+      : it.safe === 'ok-fragile' ? '<span class="badge note">✅ 可帶・防撞</span>'
+      : it.safe === 'ok' ? '<span class="badge ok">✅ 合規可帶</span>' : '';
+    const links = [];
+    if (L.o) links.push(`<a href="${esc(L.o)}" target="_blank" rel="noopener">🌐 官網／商品頁</a>`);
+    if (L.s) links.push(`<a href="${gsearch(L.s)}" target="_blank" rel="noopener">🔎 商品介紹</a>`);
+    links.push(`<a href="${gimg(imgQ(it))}" target="_blank" rel="noopener">📷 商品照片預覽</a>`);
+    return `<div class="pi-card">
+      <div class="pi-head"><b>${esc(it.name)}</b>${safe}</div>
+      ${it.price ? `<div class="pi-price">💰 ${esc(it.price)}</div>` : ''}
+      ${it.desc ? `<div class="pi-desc">${esc(it.desc)}</div>` : ''}
+      ${it.buy ? `<div class="pi-buy">🛍️ 哪裡買：${esc(it.buy)}</div>` : ''}
+      <div class="links" onclick="event.stopPropagation()">${links.join('')}</div>
+    </div>`;
+  };
   const imgQ = it => {
     if (it.img) return it.img;
     if (it.kr) return it.kr;
@@ -1594,7 +1614,7 @@
         ? `<div class="store-note">⚠️ 該店 ${fmtT(g.store.open)} 才開門，請留意抵達時間或往後挪。</div>` : '';
       return entryHtml(fmtT(r.t), '順路採購', `
         <div class="e-name">🛍️ ${esc(g.store.name)} ${g.pinnedStore ? '<span class="badge pin">📌 手動指定</span>' : ''}<span class="stay">⏳ 停留約${durTxt(r.stay)}</span></div>${earlyWarn}
-        <div class="store-items">${g.items.map(it => `<span>☐ ${esc(it.name)}</span>`).join('')}</div>
+        <div class="store-items">${g.items.map(piChip).join('')}</div><div class="pi-panel no-print" hidden></div>
         ${g.store.note ? `<div class="store-note">💡 ${esc(g.store.note)}</div>` : ''}${lateWarn}
         ${linkRow(g.store.links, g.store.links && g.store.links.g)}
         ${storeBar(g, day, r.si)}`, 'storestop');
@@ -1608,7 +1628,7 @@
       }
       const inner = r.stores.map(g => `
         <div class="store-b"><b>🛍️ ${esc(g.store.name)}</b>
-          <div class="store-items">${g.items.map(it => `<span>☐ ${esc(it.name)}</span>`).join('')}</div>
+          <div class="store-items">${g.items.map(piChip).join('')}</div><div class="pi-panel no-print" hidden></div>
           ${g.store.note ? `<div class="store-note">💡 ${esc(g.store.note)}</div>` : ''}
           ${linkRow(g.store.links, g.store.links && g.store.links.g)}
           <div class="e-edit no-print"><span class="ed-lab">這間店</span><select class="ed-sel" data-stday="${g.storeId}">
@@ -2426,6 +2446,22 @@
   /* 結果頁的委派事件只綁一次——#result-inner 不會被重建，
      每次渲染都重綁會讓同一次點擊觸發 N 個處理器（呼叫次數指數成長） */
   function bindResultEvents() {
+    // 採購清單品項：點一下在同一區塊展開價格／說明／商品照片；再點一次或點別的品項就切換
+    $('#result-inner').addEventListener('click', e => {
+      const b = e.target.closest('button.pi');
+      if (!b) return;
+      e.preventDefault();
+      const wrap = b.closest('.store-items');
+      const panel = wrap && wrap.nextElementSibling;
+      if (!panel || !panel.classList.contains('pi-panel')) return;
+      const it = DB[b.dataset.pi];
+      const wasOn = b.classList.contains('on');
+      wrap.querySelectorAll('button.pi.on').forEach(x => x.classList.remove('on'));
+      if (wasOn || !it) { panel.hidden = true; panel.innerHTML = ''; return; }
+      b.classList.add('on');
+      panel.innerHTML = piDetail(it);
+      panel.hidden = false;
+    });
     /* 站內錨點：JS 接管跳轉——先展開目標所在的收合區塊，再直接捲過去
        （原生 hash 跳轉在長頁面會被 smooth scroll 靜默取消，且重複點同一個錨點沒反應） */
     $('#result-inner').addEventListener('click', e => {

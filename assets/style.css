@@ -325,7 +325,17 @@ small { color: var(--ink-3); font-weight: 400; }
 /* ── v3：行程內採購站 ───────────── */
 .entry.storestop .e-body { background: #fffaf0; border: 1px dashed #e3c98b; border-radius: 12px; padding: 9px 12px; }
 .store-items { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-top: 6px; }
-.store-items span { font-size: 12.5px; color: var(--ink-2); background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; }
+.store-items span, .store-items button.pi { font-size: 12.5px; color: var(--ink-2); background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; }
+.store-items button.pi { cursor: pointer; font-family: inherit; line-height: 1.5; transition: .12s; }
+.store-items button.pi:hover { border-color: var(--ocean); color: var(--ocean); }
+.store-items button.pi.on { background: var(--ocean); border-color: var(--ocean); color: #fff; }
+.pi-panel { margin-top: 6px; }
+.pi-card { background: #fff; border: 1px solid #cfe0f2; border-left: 4px solid var(--ocean); border-radius: 10px; padding: 9px 12px; font-size: 12.8px; line-height: 1.7; color: var(--ink-2); }
+.pi-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13.5px; color: var(--ink); }
+.pi-price { color: #8a5a00; font-weight: 700; margin-top: 2px; }
+.pi-buy { color: var(--ink-3); font-size: 12px; }
+.pi-card .links { margin-top: 5px; }
+@media print { .pi-panel { display: none !important; } .store-items button.pi { border-color: #ccc; color: #333; background: #fff; } }
 .store-note { font-size: 12px; color: #a06b12; margin-top: 5px; }
 .store-b { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #e3c98b; }
 .store-b:first-of-type { margin-top: 4px; padding-top: 0; border-top: none; }
