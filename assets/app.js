@@ -1339,6 +1339,7 @@
       <div class="meta sub">📌 ${esc(it.area || it.buy || '')}</div>
       ${priceLine}${waitLine}${it.area ? buyLine : ''}${extraLine}${branchLine}
       <p class="desc">${esc(it.desc)}</p>
+      ${orderHtml(it)}
       ${linkRow(it.links, imgQ(it))}
     </div>`;
   }
@@ -1666,7 +1667,7 @@
       ${r.supperWait ? `<div class="e-meta sub">🍽 晚餐吃完先消化——宵夜自動延後 ${durTxt(r.supperWait)} 開始（中間是自由時間，可先回飯店放戰利品）</div>` : ''}
       ${siblings(it).length ? `<div class="e-meta sub">🏪 走不到也沒關係：${siblings(it).map(s => esc(s.area)).join('、')}也有分店</div>` : ''}
       ${it.close != null && r.end > it.close ? `<div class="e-meta warnline">⚠️ 這家約 ${fmtT(it.close)} 打烊，此時段可能來不及——建議提前或改選同品牌其他分店</div>` : ''}
-      ${atHtml(r)}${batchHtml(r)}
+      ${atHtml(r)}${batchHtml(r)}${orderHtml(it)}
       <div class="e-desc">${esc(it.desc)}</div>${planHtml(it, r.t)}${linkRow(it.links, imgQ(it))}
       ${editBar(it, day, r.slotKey, cell, r.si)}`);
   }
@@ -1686,6 +1687,15 @@
     return `<div class="batchbox ok">🎫 <b>已預約 ${fmtT(a.at)}${what}</b>——行程以它為準往前反推：
       ${a.lead ? `需在 <b>${fmtT(a.need)}</b> 前到站（留 ${durTxt(a.lead)} 報到換票）` : `需在 <b>${fmtT(a.need)}</b> 前抵達`}，
       上面的時間已經照這個算好了。${note}</div>`;
+  }
+
+  /* 推薦點法：到店直接照這個點，不用再研究菜單（韓文菜名可直接指給店員看） */
+  function orderHtml(it) {
+    if (!it.order) return '';
+    return `<div class="orderbox">🍽️ <b>推薦點法</b>｜${ordFmt(it.order)}</div>`;
+  }
+  function ordFmt(s) {
+    return esc(s).replace(/(必點|招牌|人氣|兩人建議|加點|附餐|收尾|飲品|甜點|主食|吃法|點法|注意|小提醒)：/g, '<b>$1：</b>');
   }
 
   /* 出爐場次提醒：講清楚「這個時間到到底買不買得到」，以及怎麼調整才不用乾等 */
@@ -2375,7 +2385,10 @@
         } else if (r.k === 'item') {
           const cell = r.cell;
           if (cell.anchor) L.push(`　${fmtT(r.t)} ${cell.anchor.name}${cell.anchor.shopping ? '' : '（免費）'}`);
-          else L.push(`　${fmtT(r.t)} ${cell.item.name}${cell.suggest ? '（推薦補位）' : ''}｜停留約${r.stay}分`);
+          else {
+            L.push(`　${fmtT(r.t)} ${cell.item.name}${cell.suggest ? '（推薦補位）' : ''}｜停留約${r.stay}分`);
+            if (cell.item.order) L.push(`　　🍽 ${cell.item.order}`);
+          }
         }
       });
       d.backup.forEach(it => L.push(`　⏸ 備選：${it.name}`));
