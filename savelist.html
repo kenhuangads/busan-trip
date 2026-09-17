@@ -79,15 +79,20 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
   <details open id="gBox">
     <summary>📗 Google：My Maps 匯入檔（一次全進，最快）</summary>
     <div class="bd">
-      下載 CSV（依上方「我的行程／全部」範圍匯出），到 <a href="https://mymaps.google.com" target="_blank" rel="noopener">mymaps.google.com</a> 匯入，一分鐘全部上地圖：
+      下載 CSV，到 <a href="https://mymaps.google.com" target="_blank" rel="noopener">mymaps.google.com</a> 匯入，一分鐘全部上地圖：
+      <div class="csvbtns">
+        <button data-csv="one">⬇ 全部 145 點・一檔全包</button>
+      </div>
+      <div style="margin:4px 0 2px">或依上方「我的行程／全部」範圍分三檔（三個圖層可各自換顏色）：</div>
       <div class="csvbtns">
         <button data-csv="spot">⬇ 景點＋飯店</button>
         <button data-csv="food">⬇ 美食</button>
         <button data-csv="store">⬇ 購物門市</button>
       </div>
       <ol>
-        <li>My Maps →「建立新地圖」→ 圖層「匯入」→ 選剛下載的 CSV（三個檔＝三個圖層，可各自換顏色）。</li>
+        <li>My Maps →「建立新地圖」→ 圖層「匯入」→ 選剛下載的 CSV。</li>
         <li>位置欄勾「<b>緯度</b>」＋「<b>經度</b>」，標題欄選「<b>名稱</b>」（想在地圖上顯示韓文就選「韓文」）。</li>
+        <li>一檔全包的話：圖層樣式點「<b>個別樣式</b>」→ 改成「<b>依資料欄設定樣式：類型</b>」，景點／美食／門市自動分三色（選「分類」則細分到湯飯、烤肉、咖啡…）。</li>
         <li>手機 Google 地圖 App →「已儲存」→ 最下面「地圖」就看得到，導航點了就走。</li>
       </ol>
       <div class="tip">💡 My Maps 的釘子不會出現在「已儲存的地點」星號清單裡。想要星號（搜尋時看得到❤️/🚩）就用下面清單的「Google」鈕逐家開頁按「儲存」，跟 NAVER 一樣打勾追進度。</div>
@@ -111,7 +116,7 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
 
 <footer>資料與行程工具：<a href="index.html">2026 釜山五天四夜</a>｜版本 <span id="ver"></span></footer>
 
-<script src="assets/data.js?v=20260917a"></script>
+<script src="assets/data.js?v=20260917b"></script>
 <script>
 (function () {
   'use strict';
@@ -274,20 +279,31 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
   });
   $('#q').addEventListener('input', e => { q = e.target.value.trim(); render(); });
 
-  /* ── My Maps CSV 匯出（依目前範圍）── */
-  const CSVH = ['名稱', '韓文', '緯度', '經度', '分類', '區域', '備註'];
-  const cell = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  /* ── My Maps CSV 匯出 ──
+     My Maps 的匯入器很挑：標題列不能帶引號（會把引號算進欄名、判成非法字元），
+     也不需要 BOM——所以標題列一律裸寫，資料格只在含逗號／引號／換行時才加引號 */
+  const CSVH = '名稱,韓文,緯度,經度,類型,分類,區域,備註';
+  const SEC_LABEL = { spot: '景點', food: '美食', store: '購物門市' };
+  const cell = v => {
+    const s = String(v == null ? '' : v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
   document.querySelectorAll('[data-csv]').forEach(btn => btn.addEventListener('click', () => {
     const sec = btn.dataset.csv;
-    const part = visible().filter(r => r.sec === sec && r.lat && r.lng);
+    // 「一檔全包」固定匯出全部地點，不受上方範圍與搜尋影響
+    const part = sec === 'one'
+      ? rows.filter(r => r.lat && r.lng)
+      : visible().filter(r => r.sec === sec && r.lat && r.lng);
     if (!part.length) { alert('目前範圍裡沒有這一類的項目，先切到「全部」再匯出'); return; }
-    const lines = [CSVH.map(cell).join(',')];
-    part.forEach(r => lines.push([r.name, r.kr, r.lat, r.lng, r.cat, r.zone, r.note].map(cell).join(',')));
-    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const lines = [CSVH];
+    part.forEach(r => lines.push([r.name, r.kr, r.lat, r.lng, SEC_LABEL[r.sec], r.cat, r.zone, r.note].map(cell).join(',')));
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    const secName = { spot: '景點與飯店', food: '美食', store: '購物門市' }[sec];
-    a.download = `釜山MyMaps匯入-${secName}-${scope === 'mine' ? '我的行程' : '全部'}${part.length}個.csv`;
+    const fname = sec === 'one'
+      ? `釜山MyMaps匯入-全部${part.length}點一檔全包.csv`
+      : `釜山MyMaps匯入-${{ spot: '景點與飯店', food: '美食', store: '購物門市' }[sec]}-${scope === 'mine' ? '我的行程' : '全部'}${part.length}個.csv`;
+    a.download = fname;
     document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 800);
   }));
