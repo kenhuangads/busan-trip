@@ -2084,6 +2084,7 @@
           <button id="copyLink">🔗 複製行程連結分享</button>
           <button id="sheetBtn" class="gsbtn">📊 Google 試算表</button>
           <button id="printBtn">🖨️ 列印／存 PDF</button>
+          <a class="r-abtn" href="savelist.html">📍 存進 Google／NAVER 地圖</a>
           ${(Object.keys(state.pins).length || Object.keys(state.stPins).length || Object.keys(state.ord).length || state.dayCl) ? `<button id="resetPins" class="rst">↩️ 還原自動安排（${[
             (Object.keys(state.pins).length + Object.keys(state.stPins).length) ? '已調整 ' + (Object.keys(state.pins).length + Object.keys(state.stPins).length) + ' 項' : '',
             Object.keys(state.ord).length ? '已改 ' + Object.keys(state.ord).length + ' 天順序' : '',

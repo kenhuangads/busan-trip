@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>存進地圖 App｜2026 釜山五天四夜</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📍</text></svg>">
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--ink:#1d2733;--ink2:#55637a;--ink3:#8794a8;--line:#e6e1d6;--ocean:#1f5fbf;--deep:#10386e;--ok:#1f9d63;--sun:#f5a623;--nv:#03c75a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.65;font-size:15px}
+.wrap{max-width:860px;margin:0 auto;padding:0 14px}
+a{color:var(--ocean);text-decoration:none}
+button{font-family:inherit;cursor:pointer}
+header{background:linear-gradient(152deg,#0d2f63 0%,#1f5fbf 60%,#3f8fd9 100%);color:#fff;padding:22px 0 18px}
+header .back{color:#cfe4ff;font-size:13px}
+header h1{font-size:21px;margin:6px 0 2px}
+header .sub{font-size:13px;opacity:.92}
+.ctl{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 0}
+.ctl .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.seg{display:flex;border:1.5px solid var(--line);border-radius:999px;overflow:hidden;background:#fff}
+.seg button{border:none;background:none;padding:7px 14px;font-size:13.5px;font-weight:700;color:var(--ink2)}
+.seg button.on{background:var(--ocean);color:#fff}
+#q{flex:1;min-width:140px;border:1.5px solid var(--line);border-radius:999px;padding:7px 14px;font-size:14px;outline:none;background:#fff}
+#q:focus{border-color:var(--ocean)}
+.prog{font-size:12.5px;color:var(--ink2);width:100%;display:flex;gap:14px}
+.prog b{color:var(--ink)}
+details{background:var(--card);border:1px solid var(--line);border-radius:14px;margin:12px 0;box-shadow:0 2px 10px rgba(29,39,51,.06)}
+details summary{cursor:pointer;list-style:none;padding:12px 15px;font-weight:800;font-size:14.5px}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:'▾';float:right;color:var(--ink3);transition:.15s}
+details[open] summary::after{transform:rotate(180deg)}
+details .bd{padding:0 15px 13px;font-size:13.5px;color:var(--ink2)}
+details .bd ol{padding-left:20px;margin:6px 0}
+details .bd li{margin:3px 0}
+.csvbtns{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 4px}
+.csvbtns button{border:1.5px solid var(--ocean);background:#f2f7ff;color:var(--deep);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:700}
+.csvbtns button:active{background:var(--ocean);color:#fff}
+.tip{background:#fff8ea;border:1px dashed #e3c98a;border-radius:10px;padding:8px 11px;font-size:12.8px;color:#7a5c14;margin-top:8px}
+h2.sec{font-size:16px;margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+h2.sec small{font-weight:400;color:var(--ink3);font-size:12.5px}
+.it{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.it.done{opacity:.5}
+.it .nm{flex:1;min-width:180px}
+.it .nm b{font-size:14.5px}
+.it .nm .kr{display:block;font-size:12px;color:var(--ink3)}
+.it .zone{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#eef1f6;color:var(--ink2);white-space:nowrap}
+.it .btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.it a.go{font-size:12.5px;font-weight:700;border-radius:999px;padding:5px 11px;white-space:nowrap}
+.it a.gn{background:#e8f9ef;color:#0b8a43;border:1px solid #b5e6c8}
+.it a.gg{background:#f2f7ff;color:var(--deep);border:1px solid #c9dcf5}
+.it .ck{font-size:12px;font-weight:700;border-radius:999px;padding:5px 10px;border:1.5px solid var(--line);background:#fff;color:var(--ink3);white-space:nowrap}
+.it .ck.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.empty{color:var(--ink3);text-align:center;padding:26px 0;font-size:13.5px}
+footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
+@media print{.ctl,.btns{display:none}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <a class="back" href="index.html">← 回行程規劃</a>
+  <h1>📍 把店存進自己的地圖 App</h1>
+  <div class="sub">Google 用「My Maps 匯入檔」一次全進；NAVER 沒有匯入功能，就用下面的清單逐家一鍵開 App 按「저장」，存好打個勾。</div>
+</div></header>
+
+<div class="ctl"><div class="wrap"><div class="row">
+  <div class="seg" id="scopeSeg">
+    <button data-sc="mine">我的行程</button>
+    <button data-sc="all">全部</button>
+  </div>
+  <input id="q" type="search" placeholder="搜店名／韓文…" autocomplete="off">
+  <div class="prog" id="prog"></div>
+</div></div></div>
+
+<div class="wrap">
+  <details open id="gBox">
+    <summary>📗 Google：My Maps 匯入檔（一次全進，最快）</summary>
+    <div class="bd">
+      下載 CSV（依上方「我的行程／全部」範圍匯出），到 <a href="https://mymaps.google.com" target="_blank" rel="noopener">mymaps.google.com</a> 匯入，一分鐘全部上地圖：
+      <div class="csvbtns">
+        <button data-csv="spot">⬇ 景點＋飯店</button>
+        <button data-csv="food">⬇ 美食</button>
+        <button data-csv="store">⬇ 購物門市</button>
+      </div>
+      <ol>
+        <li>My Maps →「建立新地圖」→ 圖層「匯入」→ 選剛下載的 CSV（三個檔＝三個圖層，可各自換顏色）。</li>
+        <li>位置欄勾「<b>緯度</b>」＋「<b>經度</b>」，標題欄選「<b>名稱</b>」（想在地圖上顯示韓文就選「韓文」）。</li>
+        <li>手機 Google 地圖 App →「已儲存」→ 最下面「地圖」就看得到，導航點了就走。</li>
+      </ol>
+      <div class="tip">💡 My Maps 的釘子不會出現在「已儲存的地點」星號清單裡。想要星號（搜尋時看得到❤️/🚩）就用下面清單的「Google」鈕逐家開頁按「儲存」，跟 NAVER 一樣打勾追進度。</div>
+    </div>
+  </details>
+
+  <details id="nBox">
+    <summary>📘 NAVER：逐家一鍵開 App 按「저장」</summary>
+    <div class="bd">
+      <ol>
+        <li>先在 NAVER 地圖 App 建一個清單：저장（儲存）→ 右上「＋」→ 取名「부산」。</li>
+        <li>點下面每家的「<b>NAVER</b>」綠鈕 → 自動開 App 到店家頁（另開分頁、這頁不會跑掉）。</li>
+        <li>店名旁按「<b>저장</b> ⭐」→ 選「부산」清單 → 回來打勾「N 已存」。</li>
+      </ol>
+      有 App直達的店會直接落在店家頁（不用搜尋）；少數只有搜尋模式的，點第一筆結果就是。
+    </div>
+  </details>
+
+  <div id="list"></div>
+</div>
+
+<footer>資料與行程工具：<a href="index.html">2026 釜山五天四夜</a>｜版本 <span id="ver"></span></footer>
+
+<script src="assets/data.js?v=20260917a"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  $('#ver').textContent = CONFIG.build;
+
+  /* ── NAVER App 直達（沿用 index 的做法：新分頁裡叫 App，本頁不動）── */
+  const APPNAME = 'kenhuangads.github.io';
+  const nvTarget = (kind, val) => kind === 'place'
+    ? 'place?id=' + encodeURIComponent(val) + '&appname=' + APPNAME
+    : 'search?query=' + encodeURIComponent(val) + '&appname=' + APPNAME;
+  const nvWeb = (kind, val) => kind === 'place'
+    ? 'https://map.naver.com/p/entry/place/' + encodeURIComponent(val)
+    : 'https://map.naver.com/p/search/' + encodeURIComponent(val);
+  const gmap = q => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
+
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[data-nv]');
+    if (!a) return;
+    const ua = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(ua);
+    const isIOS = /iPad|iPhone|iPod/i.test(ua) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 2);
+    if (!isAndroid && !isIOS) return;
+    const web = a.href, target = a.dataset.nv;
+    const deep = isAndroid
+      ? 'intent://' + target + '#Intent;scheme=nmap;action=android.intent.action.VIEW;' +
+        'category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;' +
+        'S.browser_fallback_url=' + encodeURIComponent(web) + ';end'
+      : 'nmap://' + target;
+    const w = window.open('', '_blank');
+    if (!w) return;
+    e.preventDefault(); e.stopPropagation();
+    const j = JSON.stringify;
+    w.document.write(
+      '<!doctype html><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<title>開啟 NAVER 地圖…</title>' +
+      '<body style="margin:0;display:flex;min-height:90vh;align-items:center;justify-content:center;' +
+      "font-family:-apple-system,'Noto Sans TC',sans-serif;color:#37414f;text-align:center;line-height:1.9\">" +
+      '<div><div style="font-size:34px">🗺️</div><b>正在開啟 NAVER 地圖 App…</b>' +
+      '<div style="font-size:13px;color:#7b8697;margin-top:6px">在店家頁按「저장 ⭐」存進清單，<br>存好回來打勾就行</div>' +
+      '<div style="margin-top:14px"><a href="' + esc(web) + '" style="font-size:13px;color:#1f5fbf">' +
+      '沒有跳轉的話 → 改開網頁版地圖</a></div></div>' +
+      '<' + 'script>location.href=' + j(deep) + ';' +
+      (isAndroid ? '' : 'setTimeout(function(){if(!document.hidden)location.replace(' + j(web) + ')},1500);') +
+      '<' + '/script>');
+    w.document.close();
+  }, true);
+
+  /* ── 資料整理：三個分區（景點＋飯店／美食／購物門市）── */
+  const zoneTxt = z => (ZONES[z] && ZONES[z].st) || '';
+  const clTxt = c => (CLUSTERS[c] && CLUSTERS[c].short) || '';
+  const rows = [];
+  rows.push({ key: 'hotel', sec: 'spot', icon: '🏨', name: HOTEL.name, kr: '롯데호텔 부산', area: '西面站',
+    lat: HOTEL.lat, lng: HOTEL.lng, cat: '住宿', zone: '西面', g: '롯데호텔 부산', nvKind: 'search', nvVal: '롯데호텔 부산', note: '住宿（已訂好）' });
+  SPOTS.forEach(s => {
+    const m = META[s.id] || {}, L = s.links || {};
+    rows.push({ key: s.id, sec: 'spot', icon: '🗼', name: s.name, kr: s.kr || '', area: clTxt(s.cluster),
+      lat: m.lat, lng: m.lng, cat: '景點', zone: clTxt(s.cluster), g: L.g || s.kr || s.name,
+      nvKind: L.nid ? 'place' : 'search', nvVal: L.nid || L.n || s.kr || s.name,
+      note: (s.desc || '').slice(0, 60) });
+  });
+  FOODS.forEach(f => {
+    const m = META[f.id] || {}, L = f.links || {};
+    const cat = (FOOD_CATS[f.cat] && FOOD_CATS[f.cat].label) || '美食';
+    rows.push({ key: f.id, sec: 'food', icon: (FOOD_CATS[f.cat] && FOOD_CATS[f.cat].icon) || '🍜',
+      name: f.name, kr: f.kr || '', area: f.area || clTxt(f.cluster),
+      lat: m.lat, lng: m.lng, cat: cat, zone: clTxt(f.cluster), g: L.g || f.kr || f.name,
+      nvKind: L.nid ? 'place' : 'search', nvVal: L.nid || L.n || f.kr || f.name,
+      note: (f.price ? f.price + '｜' : '') + (f.desc || '').slice(0, 60) });
+  });
+  Object.entries(STORES).forEach(([k, s]) => {
+    if (k === 'cvs') return; // 泛稱超商不放地圖
+    const L = s.links || {};
+    rows.push({ key: 'st:' + k, sec: 'store', icon: '🛍️', name: s.name, kr: L.n || '', area: zoneTxt(s.zone),
+      lat: s.lat, lng: s.lng, cat: '購物門市', zone: zoneTxt(s.zone), g: L.g || L.n || s.name,
+      nvKind: L.nid ? 'place' : 'search', nvVal: L.nid || L.n || s.name,
+      note: (s.note || '').slice(0, 70) });
+  });
+
+  /* ── 「我的行程」範圍：勾選（localStorage 或 ?s=）＋由勾選商品推出的門市 ── */
+  function mineKeys() {
+    let sel = [];
+    const usp = new URLSearchParams(location.search);
+    if (usp.get('s')) sel = usp.get('s').split('.').filter(Boolean);
+    else { try { sel = JSON.parse(localStorage.getItem('busan_sel_v2') || '[]') || []; } catch (e) {} }
+    const ks = new Set(['hotel']);
+    const stores = new Set();
+    sel.forEach(id => {
+      if (/^[sf]\d/.test(id)) ks.add(id);
+      else if (META[id] && META[id].store) stores.add(META[id].store);
+    });
+    try {
+      const sp = JSON.parse(localStorage.getItem('busan_stpin_v1') || '{}') || {};
+      Object.keys(sp).forEach(k => stores.add(k));
+    } catch (e) {}
+    stores.forEach(k => ks.add('st:' + k));
+    return { ks, selCount: sel.length };
+  }
+
+  /* ── 進度（打勾）── */
+  let done = {};
+  try { done = JSON.parse(localStorage.getItem('busan_maps_done_v1') || '{}') || {}; } catch (e) {}
+  const saveDone = () => { try { localStorage.setItem('busan_maps_done_v1', JSON.stringify(done)); } catch (e) {} };
+
+  /* ── 畫面 ── */
+  const SECS = [['spot', '🗼 景點＋飯店'], ['food', '🍜 美食'], ['store', '🛍️ 購物門市']];
+  let scope = 'mine', q = '';
+  const mine = mineKeys();
+  if (!mine.selCount) scope = 'all';
+
+  function visible() {
+    let list = rows;
+    if (scope === 'mine') list = rows.filter(r => mine.ks.has(r.key));
+    if (q) { const s = q.toLowerCase(); list = list.filter(r => (r.name + r.kr + r.area).toLowerCase().includes(s)); }
+    return list;
+  }
+
+  function render() {
+    document.querySelectorAll('#scopeSeg button').forEach(b => b.classList.toggle('on', b.dataset.sc === scope));
+    const list = visible();
+    let html = '';
+    SECS.forEach(([sec, label]) => {
+      const part = list.filter(r => r.sec === sec);
+      if (!part.length) return;
+      html += `<h2 class="sec">${label} <small>${part.length} 個</small></h2>`;
+      part.forEach(r => {
+        const d = done[r.key] || {};
+        html += `<div class="it ${d.n && d.g ? 'done' : ''}" data-key="${esc(r.key)}">
+          <div class="nm"><b>${r.icon} ${esc(r.name)}</b><span class="kr">${esc(r.kr)}${r.area ? '｜' + esc(r.area) : ''}</span></div>
+          <div class="btns">
+            <a class="go gn" href="${nvWeb(r.nvKind, r.nvVal)}" data-nv="${esc(nvTarget(r.nvKind, r.nvVal))}" target="_blank" rel="noopener">NAVER</a>
+            <a class="go gg" href="${gmap(r.g)}" target="_blank" rel="noopener">Google</a>
+            <button class="ck ${d.n ? 'on' : ''}" data-ck="n">N ${d.n ? '✓' : '已存?'}</button>
+            <button class="ck ${d.g ? 'on' : ''}" data-ck="g">G ${d.g ? '✓' : '已存?'}</button>
+          </div></div>`;
+      });
+    });
+    $('#list').innerHTML = html || '<div class="empty">這個範圍沒有項目——切到「全部」看看，或換個關鍵字</div>';
+    const nD = list.filter(r => (done[r.key] || {}).n).length;
+    const gD = list.filter(r => (done[r.key] || {}).g).length;
+    $('#prog').innerHTML = `<span>🟢 NAVER 已存 <b>${nD}</b>/${list.length}</span><span>🔵 Google 已存 <b>${gD}</b>/${list.length}</span>` +
+      (scope === 'mine' ? `<span style="margin-left:auto">依你目前的勾選（${mine.selCount} 項）</span>` : '');
+  }
+
+  $('#list').addEventListener('click', e => {
+    const b = e.target.closest('button[data-ck]');
+    if (!b) return;
+    const key = b.closest('.it').dataset.key, which = b.dataset.ck;
+    done[key] = done[key] || {};
+    done[key][which] = done[key][which] ? 0 : 1;
+    saveDone(); render();
+  });
+  $('#scopeSeg').addEventListener('click', e => {
+    const b = e.target.closest('button[data-sc]');
+    if (!b) return;
+    scope = b.dataset.sc; render();
+  });
+  $('#q').addEventListener('input', e => { q = e.target.value.trim(); render(); });
+
+  /* ── My Maps CSV 匯出（依目前範圍）── */
+  const CSVH = ['名稱', '韓文', '緯度', '經度', '分類', '區域', '備註'];
+  const cell = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  document.querySelectorAll('[data-csv]').forEach(btn => btn.addEventListener('click', () => {
+    const sec = btn.dataset.csv;
+    const part = visible().filter(r => r.sec === sec && r.lat && r.lng);
+    if (!part.length) { alert('目前範圍裡沒有這一類的項目，先切到「全部」再匯出'); return; }
+    const lines = [CSVH.map(cell).join(',')];
+    part.forEach(r => lines.push([r.name, r.kr, r.lat, r.lng, r.cat, r.zone, r.note].map(cell).join(',')));
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const secName = { spot: '景點與飯店', food: '美食', store: '購物門市' }[sec];
+    a.download = `釜山MyMaps匯入-${secName}-${scope === 'mine' ? '我的行程' : '全部'}${part.length}個.csv`;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 800);
+  }));
+
+  render();
+})();
+</script>
+</body>
+</html>
