@@ -63,7 +63,7 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
 <header><div class="wrap">
   <a class="back" href="index.html">← 回行程規劃</a>
   <h1>📍 把店存進自己的地圖 App</h1>
-  <div class="sub">Google 用「My Maps 匯入檔」一次全進；NAVER 沒有匯入功能，就用下面的清單逐家一鍵開 App 按「저장」，存好打個勾。</div>
+  <div class="sub">Google 與 NAVER 都不開放清單匯入——想「點開地標就看到完整商家資訊」，就用下面的清單逐家一鍵開商家頁按儲存、存好打勾追進度；My Maps 匯入檔則是一次全上的總覽圖。</div>
 </div></header>
 
 <div class="ctl"><div class="wrap"><div class="row">
@@ -77,25 +77,28 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
 
 <div class="wrap">
   <details open id="gBox">
-    <summary>📗 Google：My Maps 匯入檔（一次全進，最快）</summary>
+    <summary>📗 Google：想「點開就看到完整商家資訊」→ 用清單存法</summary>
     <div class="bd">
-      下載 CSV，到 <a href="https://mymaps.google.com" target="_blank" rel="noopener">mymaps.google.com</a> 匯入，一分鐘全部上地圖：
+      <b style="color:var(--ink)">A. 存進 Google「清單」——點開地標＝完整商家頁（照片、評論、營業時間、電話）</b>
+      <ol>
+        <li>Google 地圖 App →「<b>已儲存</b>」→「<b>＋ 新清單</b>」取名「釜山」（只做一次）。</li>
+        <li>點下面每家的藍色「<b>Google</b>」鈕 → 直接開到那家的商家頁 → 按「<b>儲存</b>」→ 選「釜山」。</li>
+        <li>回來打勾「<b>G 已存</b>」記進度，下次接著存。</li>
+      </ol>
+      <div class="tip">💡 Google 沒開放清單匯入（沒有 API 也不能吃 CSV），整批塞進清單做不到——這條「開頁→儲存」是最快的路，一家大約 3 秒；先切「我的行程」範圍就只需要存會去的那幾家。</div>
+      <b style="color:var(--ink);display:block;margin-top:10px">B. My Maps 全圖總覽——一次匯入看動線（釘子是座標點，點開是資料卡）</b>
       <div class="csvbtns">
         <button data-csv="one">⬇ 全部 145 點・一檔全包</button>
-      </div>
-      <div style="margin:4px 0 2px">或依上方「我的行程／全部」範圍分三檔（三個圖層可各自換顏色）：</div>
-      <div class="csvbtns">
         <button data-csv="spot">⬇ 景點＋飯店</button>
         <button data-csv="food">⬇ 美食</button>
         <button data-csv="store">⬇ 購物門市</button>
       </div>
       <ol>
-        <li>My Maps →「建立新地圖」→ 圖層「匯入」→ 選剛下載的 CSV。</li>
-        <li>位置欄勾「<b>緯度</b>」＋「<b>經度</b>」，標題欄選「<b>名稱</b>」（想在地圖上顯示韓文就選「韓文」）。</li>
-        <li>一檔全包的話：圖層樣式點「<b>個別樣式</b>」→ 改成「<b>依資料欄設定樣式：類型</b>」，景點／美食／門市自動分三色（選「分類」則細分到湯飯、烤肉、咖啡…）。</li>
-        <li>手機 Google 地圖 App →「已儲存」→ 最下面「地圖」就看得到，導航點了就走。</li>
+        <li><a href="https://mymaps.google.com" target="_blank" rel="noopener">mymaps.google.com</a> →「建立新地圖」→ 圖層「匯入」→ 選 CSV；位置欄勾「<b>緯度</b>」＋「<b>經度</b>」，標題選「<b>名稱</b>」。</li>
+        <li>一檔全包：樣式改「<b>依資料欄設定樣式：類型</b>」自動分三色；分三檔（吃上方範圍切換）＝三個圖層各自換色。</li>
+        <li>釘子的資料卡裡有「<b>Google商家頁</b>」「<b>NAVER店家頁</b>」連結——點了直接跳到完整商家資訊，不會只剩經緯度。</li>
+        <li>手機 Google 地圖 App →「已儲存」→ 最下面「地圖」開啟這張圖。</li>
       </ol>
-      <div class="tip">💡 My Maps 的釘子不會出現在「已儲存的地點」星號清單裡。想要星號（搜尋時看得到❤️/🚩）就用下面清單的「Google」鈕逐家開頁按「儲存」，跟 NAVER 一樣打勾追進度。</div>
     </div>
   </details>
 
@@ -116,7 +119,7 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
 
 <footer>資料與行程工具：<a href="index.html">2026 釜山五天四夜</a>｜版本 <span id="ver"></span></footer>
 
-<script src="assets/data.js?v=20260917b"></script>
+<script src="assets/data.js?v=20260918a"></script>
 <script>
 (function () {
   'use strict';
@@ -282,7 +285,7 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
   /* ── My Maps CSV 匯出 ──
      My Maps 的匯入器很挑：標題列不能帶引號（會把引號算進欄名、判成非法字元），
      也不需要 BOM——所以標題列一律裸寫，資料格只在含逗號／引號／換行時才加引號 */
-  const CSVH = '名稱,韓文,緯度,經度,類型,分類,區域,備註';
+  const CSVH = '名稱,韓文,緯度,經度,類型,分類,區域,備註,Google商家頁,NAVER店家頁';
   const SEC_LABEL = { spot: '景點', food: '美食', store: '購物門市' };
   const cell = v => {
     const s = String(v == null ? '' : v);
@@ -296,7 +299,8 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
       : visible().filter(r => r.sec === sec && r.lat && r.lng);
     if (!part.length) { alert('目前範圍裡沒有這一類的項目，先切到「全部」再匯出'); return; }
     const lines = [CSVH];
-    part.forEach(r => lines.push([r.name, r.kr, r.lat, r.lng, SEC_LABEL[r.sec], r.cat, r.zone, r.note].map(cell).join(',')));
+    part.forEach(r => lines.push([r.name, r.kr, r.lat, r.lng, SEC_LABEL[r.sec], r.cat, r.zone, r.note,
+      gmap(r.g), nvWeb(r.nvKind, r.nvVal)].map(cell).join(',')));
     const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
