@@ -112,6 +112,8 @@
     pins: {},               // 手動調整：{ 項目id: { d:第幾天(0-4), s:時段key或null } }
     at: {},                 // 已預約的時段：{ 項目id: 分鐘 }（例如膠囊列車 14:00 → 840）
     stPins: {},             // 購物門市手動指定：{ 門市key: { d:第幾天(0-4) } }
+    exSt: {},               // 手動移除的採購站：{ 門市key: 1 }（品項退回排不進面板，可再改排回來）
+    exAn: {},               // 手動移除的散步/採購時間填充錨點：{ 天索引: 1 }
     ord: {},                // 當日手動排序：{ 第幾天: [停靠點key…] }（key＝項目id／st:門市／d5shop／anchor）
     dayCl: null             // 整天對調：Day2-4 各自負責的生活圈，null＝系統自動安排
   };
@@ -196,6 +198,8 @@
       localStorage.setItem('busan_pins_v1', JSON.stringify(state.pins));
       localStorage.setItem('busan_at_v1', JSON.stringify(state.at));
       localStorage.setItem('busan_stpin_v1', JSON.stringify(state.stPins));
+      localStorage.setItem('busan_exst_v1', JSON.stringify(state.exSt));
+      localStorage.setItem('busan_exan_v1', JSON.stringify(state.exAn));
       localStorage.setItem('busan_ord_v1', JSON.stringify(state.ord));
       localStorage.setItem('busan_daycl_v1', JSON.stringify(state.dayCl));
     } catch (e) {}
@@ -208,6 +212,8 @@
       try { state.pins = JSON.parse(localStorage.getItem('busan_pins_v1') || '{}') || {}; } catch (e) { state.pins = {}; }
       try { state.at = JSON.parse(localStorage.getItem('busan_at_v1') || '{}') || {}; } catch (e) { state.at = {}; }
       try { state.stPins = JSON.parse(localStorage.getItem('busan_stpin_v1') || '{}') || {}; } catch (e) { state.stPins = {}; }
+      try { state.exSt = JSON.parse(localStorage.getItem('busan_exst_v1') || '{}') || {}; } catch (e) { state.exSt = {}; }
+      try { state.exAn = JSON.parse(localStorage.getItem('busan_exan_v1') || '{}') || {}; } catch (e) { state.exAn = {}; }
       try { state.ord = JSON.parse(localStorage.getItem('busan_ord_v1') || '{}') || {}; } catch (e) { state.ord = {}; }
       try { state.dayCl = JSON.parse(localStorage.getItem('busan_daycl_v1') || 'null'); } catch (e) { state.dayCl = null; }
     } catch (e) {}
@@ -227,8 +233,10 @@
   const extraParams = () => {
     const p = encPins(), sp = encStPins(), o = encOrd(), at = encAt();
     const dc = state.dayCl ? '&dc=' + state.dayCl.join('.') : '';
+    const xs = Object.keys(state.exSt).filter(k => STORES[k]).join('.');
+    const xa = Object.keys(state.exAn).filter(d => d >= 0 && d <= 4).join('.');
     return (p ? '&p=' + p : '') + (sp ? '&sp=' + sp : '') + (o ? '&o=' + encodeURIComponent(o) : '') +
-      (at ? '&at=' + at : '') + dc;
+      (at ? '&at=' + at : '') + dc + (xs ? '&xs=' + xs : '') + (xa ? '&xa=' + xa : '');
   };
   function shareUrl() {
     const ids = [...state.sel].sort();
@@ -273,6 +281,12 @@
     });
     const dc = p.get('dc');
     state.dayCl = (dc && dc.split('.').length === 3 && dc.split('.').every(c => CLUSTERS[c])) ? dc.split('.') : null;
+    const xs = p.get('xs');
+    state.exSt = {};
+    if (xs) xs.split('.').forEach(k => { if (STORES[k]) state.exSt[k] = 1; });
+    const xa = p.get('xa');
+    state.exAn = {};
+    if (xa) xa.split('.').forEach(d => { if (+d >= 0 && +d <= 4) state.exAn[+d] = 1; });
     state.fromShare = true;
     return true;
   }
@@ -1049,11 +1063,13 @@
       const p = state.stPins[g.storeId];
       return (p && p.d >= 0 && p.d <= 4) ? p.d : null;
     };
-    const pinnedEarly = storeGroups.filter(g => g !== cvsGroup && stPinOf(g) != null && stPinOf(g) < 4);
-    const smGroups = storeGroups.filter(g => g !== cvsGroup && !pinnedEarly.includes(g) && ZONES[g.store.zone].cluster === 'seomyeon');
+    // 使用者按了「✕ 移除」的採購站：完全不參與排程，品項退回「排不進的門市」面板隨時可改排回來
+    const exGrp = g => !!state.exSt[g.storeId];
+    const pinnedEarly = storeGroups.filter(g => g !== cvsGroup && !exGrp(g) && stPinOf(g) != null && stPinOf(g) < 4);
+    const smGroups = storeGroups.filter(g => g !== cvsGroup && !exGrp(g) && !pinnedEarly.includes(g) && ZONES[g.store.zone].cluster === 'seomyeon');
     // 西面門市要排 Day 1 下午而不是 Day 5 上午：中午後才開門的選品店、或需要製作時間的店（配鏡 1～3 小時，離場前排不下）
     const wantD1 = g => (g.store.open || 0) >= 660 || !!g.store.d1;
-    const otherGroups = storeGroups.filter(g => g !== cvsGroup && !pinnedEarly.includes(g) && !smGroups.includes(g));
+    const otherGroups = storeGroups.filter(g => g !== cvsGroup && !exGrp(g) && !pinnedEarly.includes(g) && !smGroups.includes(g));
     const pinnedD5Other = otherGroups.filter(g => stPinOf(g) === 4);
     const autoOther = otherGroups.filter(g => stPinOf(g) == null);
 
@@ -1068,6 +1084,7 @@
     days.forEach((d, di) => {
       const a = ANCHORS[d.cluster];
       if (!a) return;
+      if (state.exAn[di]) return;   // 使用者移除過這天的填充錨點就不再插
       if (storeLoad(di) >= 2) return;
       if (d.full) {
         if (!d.slots.afternoon && !d.slots.evening) d.slots.afternoon = { anchor: a };
@@ -1281,6 +1298,7 @@
       const di = placedDayOf(g);
       let hint;
       if (g.storeId === 'cvs') hint = '隨時順手買｜' + g.store.name;
+      else if (state.exSt[g.storeId]) hint = `🚫 你手動移除了這一站——想恢復就在下面選個日子改排回來｜${g.store.name}`;
       else if (g.closedDay) hint = `⚠️ 這趟排不到（該店在對應行程日公休）｜${g.store.name}`;
       else if (di >= 0) hint = `Day ${di + 1} ${g.pinnedStore ? '手動指定採買' : '順路採買'}｜${g.store.name}`;
       else if (g.trimmedOut && g.pinnedStore) hint = `⚠️ 你指定的 Day ${((state.stPins[g.storeId] || {}).d || 0) + 1} 塞不進這間店的營業時間，請改指定別天｜${g.store.name}`;
@@ -1637,7 +1655,7 @@
           <div class="e-edit no-print"><span class="ed-lab">這間店</span><select class="ed-sel" data-stday="${g.storeId}">
             <option value="4" selected>留在 Day 5 最終採購</option>
             ${[0, 1, 2, 3].map(i => `<option value="${i}">提前到 Day ${i + 1} 買</option>`).join('')}
-          </select></div></div>`).join('');
+          </select><button class="ed del" data-stdrop="${g.storeId}" title="這間不去了——品項退回頂部的「排不進的門市」面板，隨時可改排回來">✕ 移除</button></div></div>`).join('');
       return entryHtml(fmtT(r.t), SLOT_LABELS.d5shop, `
         <div class="e-name">🛒 西面最終採購（${r.stores.reduce((s, g) => s + g.items.length, 0)} 項）<span class="stay">⏳ 合計約${durTxt(r.stay)}</span></div>
         ${inner}
@@ -1652,7 +1670,8 @@
       return entryHtml(fmtT(r.t), label, `
         <div class="e-name">${a.shopping ? '🛍️' : '🚶'} ${esc(a.name)} <span class="badge free">${a.shopping ? '採購時間' : '免費散步'}</span> <span class="stay">⏳ 約${durTxt(r.stay)}</span></div>
         <div class="e-desc">${esc(a.desc)}</div>${linkRow(a.links, a.links && a.links.g)}
-        <div class="e-edit no-print"><span class="ed-lab">調整</span>${moveBtns(day, r.si)}</div>`);
+        <div class="e-edit no-print"><span class="ed-lab">調整</span>${moveBtns(day, r.si)}
+          <button class="ed del" data-androp="${day._idx}" title="移除這段自動填充的散步/採購時間（多出來的時間變自由時間；想恢復按上方「還原自動安排」）">✕ 移除</button></div>`);
     }
     const it = cell.item;
     const ci = catInfo(it);
@@ -1773,6 +1792,7 @@
       <button class="ed" data-stmv="${g.storeId}|${di - 1}"${di <= 0 ? ' disabled' : ''} title="這站採購移到前一天">◀ ${di > 0 ? 'Day' + di : '前一天'}</button>
       <button class="ed" data-stmv="${g.storeId}|${di + 1}"${di >= 4 ? ' disabled' : ''} title="這站採購移到後一天">${di < 4 ? 'Day' + (di + 2) : '後一天'} ▶</button>
       ${pinned ? `<button class="ed" data-stauto="${g.storeId}" title="取消手動指定，交回系統自動安排">↩ 自動</button>` : ''}
+      <button class="ed del" data-stdrop="${g.storeId}" title="這站不去了——想買的品項會列回頂部的「排不進的門市」面板，隨時可改排回來">✕ 移除</button>
     </div>`;
   }
 
@@ -2085,9 +2105,10 @@
           <button id="sheetBtn" class="gsbtn">📊 Google 試算表</button>
           <button id="printBtn">🖨️ 列印／存 PDF</button>
           <a class="r-abtn" href="savelist.html">📍 存進 Google／NAVER 地圖</a>
-          ${(Object.keys(state.pins).length || Object.keys(state.stPins).length || Object.keys(state.ord).length || state.dayCl) ? `<button id="resetPins" class="rst">↩️ 還原自動安排（${[
+          ${(Object.keys(state.pins).length || Object.keys(state.stPins).length || Object.keys(state.ord).length || state.dayCl || Object.keys(state.exSt).length || Object.keys(state.exAn).length) ? `<button id="resetPins" class="rst">↩️ 還原自動安排（${[
             (Object.keys(state.pins).length + Object.keys(state.stPins).length) ? '已調整 ' + (Object.keys(state.pins).length + Object.keys(state.stPins).length) + ' 項' : '',
             Object.keys(state.ord).length ? '已改 ' + Object.keys(state.ord).length + ' 天順序' : '',
+            (Object.keys(state.exSt).length + Object.keys(state.exAn).length) ? '已移除 ' + (Object.keys(state.exSt).length + Object.keys(state.exAn).length) + ' 站' : '',
             state.dayCl ? '已換過天' : ''].filter(Boolean).join('、')}）</button>` : ''}
         </div>
       </header>
@@ -2495,7 +2516,7 @@
       window.scrollTo(0, Math.max(0, t.getBoundingClientRect().top + window.scrollY - off));
     }, true);
     $('#result-inner').addEventListener('click', e => {
-      if (e.target.closest('#resetPins')) { state.pins = {}; state.stPins = {}; state.ord = {}; state.at = {}; state.dayCl = null; reflow('已還原成系統自動安排'); return; }
+      if (e.target.closest('#resetPins')) { state.pins = {}; state.stPins = {}; state.ord = {}; state.at = {}; state.dayCl = null; state.exSt = {}; state.exAn = {}; reflow('已還原成系統自動安排'); return; }
       const da = e.target.closest('[data-dayauto]');
       if (da) {
         delete state.ord[+da.dataset.dayauto];
@@ -2530,6 +2551,23 @@
       if (sa) {
         delete state.stPins[sa.dataset.stauto];
         reflow('這站採購已改回系統自動安排');
+        return;
+      }
+      const sdp = e.target.closest('[data-stdrop]');
+      if (sdp) {
+        const sid = sdp.dataset.stdrop;
+        if (!STORES[sid]) return;
+        state.exSt[sid] = 1;
+        delete state.stPins[sid];
+        reflow(`已移除採購站「${STORES[sid].name}」——想買的品項列在頂部「排不進的門市」面板，隨時可以改排回來`);
+        return;
+      }
+      const adp = e.target.closest('[data-androp]');
+      if (adp) {
+        const di = +adp.dataset.androp;
+        if (!(di >= 0 && di <= 4)) return;
+        state.exAn[di] = 1;
+        reflow(`已移除 Day ${di + 1} 的自動填充時段，多出來的時間變成自由時間（想恢復請按「還原自動安排」）`);
         return;
       }
       const ad = e.target.closest('[data-add]');
@@ -2575,6 +2613,8 @@
       if (sd) {
         const sid = sd.dataset.stday;
         if (!STORES[sid]) return;
+        const wasEx = !!state.exSt[sid];
+        delete state.exSt[sid];   // 指定日期＝把手動移除的店排回來
         if (sd.value === '') {
           delete state.stPins[sid];
           reflow(`「${STORES[sid].name}」已改回系統自動安排`);
@@ -2583,7 +2623,7 @@
         const di = +sd.value;
         if (!(di >= 0 && di <= 4)) return;
         state.stPins[sid] = { d: di };
-        reflow(`已把「${STORES[sid].name}」的採購指定到 Day ${di + 1}，行程重新排好了`);
+        reflow(`已把「${STORES[sid].name}」的採購${wasEx ? '排回' : '指定到'} Day ${di + 1}，行程重新排好了`);
         return;
       }
       const sel = e.target.closest('[data-slot]');
