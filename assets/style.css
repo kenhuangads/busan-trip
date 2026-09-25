@@ -468,6 +468,11 @@ small { color: var(--ink-3); font-weight: 400; }
 }
 .addrbtn em { font-style: normal; font-weight: 400; font-size: 11px; color: #9a7a1c; white-space: nowrap; }
 .addrbtn i { font-style: normal; font-weight: 500; font-size: 11.5px; color: #8a6d12; }
+/* Uber 深連結（黑底＝Uber 品牌色），飯店列與首頁卡片也會用到，所以不限定在 .links 裡 */
+a.uber { display: inline-flex; align-items: center; gap: 4px; background: #111; color: #fff !important; border: 1px solid #111; border-radius: 999px; padding: 1px 10px; font-size: 12.5px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+a.uber:hover { background: #333; border-color: #333; text-decoration: none; }
+.links-inline { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+@media print { a.uber { display: none; } }
 /* 下車點／省時提醒：自成一行，接在地址鈕下面 */
 .links .drop { flex-basis: 100%; font-size: 12.5px; line-height: 1.6; color: #6b4d00; background: #fffbea; border-left: 3px solid #efd98a; padding: 3px 8px; border-radius: 0 6px 6px 0; }
 .addrbtn:hover { background: #ffedb0; border-color: #e2c25a; }

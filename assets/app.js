@@ -24,12 +24,25 @@
                  S.browser_fallback_url=…（沒裝 App 由系統自動落回網頁，不會卡住）
      nmap／navermaps 兩個 scheme 都在 NAVER 官方白名單內。桌機不攔截，照常開網頁版。 */
   const APPNAME = 'kenhuangads.github.io';
+  /* kind：place＝店家 id 直達｜coord＝沒有 id 的地點以座標插旗（任何介面語言都不用搜尋）
+           route＝從目前位置導航到座標（大眾運輸）｜search＝關鍵字搜尋（最後手段） */
   const nvTarget = (kind, val) => kind === 'place'
     ? 'place?id=' + encodeURIComponent(val) + '&appname=' + APPNAME
+    : kind === 'coord'
+    ? 'place?lat=' + val.lat + '&lng=' + val.lng + '&name=' + encodeURIComponent(val.name) + '&appname=' + APPNAME
+    : kind === 'route'
+    ? 'route/public?dlat=' + val.lat + '&dlng=' + val.lng + '&dname=' + encodeURIComponent(val.name) + '&appname=' + APPNAME
     : 'search?query=' + encodeURIComponent(val) + '&appname=' + APPNAME;
   const nvWeb = (kind, val) => kind === 'place'
     ? 'https://map.naver.com/p/entry/place/' + encodeURIComponent(val)
-    : nmap(val);
+    : nmap((kind === 'coord' || kind === 'route') ? val.name : val);
+  // Uber 深連結：帶座標直接把目的地設好，不必在 App 裡打字搜尋（沒裝 App 會導到商店／網頁版）
+  const uberLink = (pos, addr) => 'https://m.uber.com/ul/?action=setPickup&pickup=my_location' +
+    '&dropoff[latitude]=' + pos.lat + '&dropoff[longitude]=' + pos.lng +
+    '&dropoff[nickname]=' + encodeURIComponent(pos.name) +
+    (addr ? '&dropoff[formatted_address]=' + encodeURIComponent(addr) : '');
+  // 複製用官方全稱（부산광역시 …）：NAVER 介面切成中／英文時，簡稱「부산」的地址偶爾搜不到
+  const fullAddr = a => a ? String(a).replace(/^부산 /, '부산광역시 ') : a;
   const nvLink = (kind, val, label) =>
     `<a class="nv" href="${nvWeb(kind, val)}" data-nv="${esc(nvTarget(kind, val))}" target="_blank" rel="noopener">${label}</a>`;
   const gsearch = q => 'https://www.google.com/search?q=' + encodeURIComponent(q);
@@ -123,14 +136,28 @@
   // 按鈕直接把地址印出來，不用貼也能把手機拿給司機看。
   // addrX＝樓層／建物（只顯示不複製，下車後找店用）；drop＝最佳下車點與省時提醒（大型景點才有）
   const addrBtn = (addr, label, addrX) => addr
-    ? `<button type="button" class="addrbtn" data-addr="${esc(addr)}" title="點一下複製韓文地址——貼到 Uber／Kakao T 的目的地搜尋一貼就中（NAVER 官方登記的道路名地址，已逐一核對）">🚕 ${esc(addr)}${addrX ? ` <i>${esc(addrX)}</i>` : ''} <em>${label || '複製地址'}</em></button>`
+    ? `<button type="button" class="addrbtn" data-addr="${esc(fullAddr(addr))}" title="點一下複製韓文地址——貼到 Uber／Kakao T 的目的地搜尋一貼就中（NAVER 官方登記的道路名地址，已逐一核對）">🚕 ${esc(fullAddr(addr))}${addrX ? ` <i>${esc(addrX)}</i>` : ''} <em>${label || '複製地址'}</em></button>`
     : '';
   const dropNote = drop => drop ? `<span class="drop">🚖 下車點：${esc(drop)}</span>` : '';
-  function linkRow(links, imgQuery) {
+  const uberBtn = (pos, addr) => pos && pos.lat
+    ? `<a class="uber" href="${uberLink(pos, fullAddr(addr))}" target="_blank" rel="noopener" title="開 Uber App 並直接把目的地設成這裡（帶座標，不用打字搜尋、不受介面語言影響）">🚗 Uber 直接設目的地</a>`
+    : '';
+  // 項目座標（Uber／NAVER 座標直達用）：景點／美食用自身或 META 的 lat/lng；商品用所屬門市
+  const posOfItem = it => {
+    if (!it) return null;
+    if (it.kind === 'shop') return posOfStore(it._store || STORES[((META[it.id] || {}).store)]);
+    const m = META[it.id] || {};
+    const lat = it.lat || m.lat, lng = it.lng || m.lng;
+    return lat ? { lat, lng, name: it.kr || (it.links && it.links.n) || it.name } : null;
+  };
+  const posOfStore = st => st && st.lat ? { lat: st.lat, lng: st.lng, name: (st.links && st.links.n) || st.name } : null;
+  const HOTEL_POS = { lat: HOTEL.lat, lng: HOTEL.lng, name: '롯데호텔 부산' };
+  function linkRow(links, imgQuery, pos) {
     if (!links && !imgQuery) return '';
     links = links || {};
     const a = [];
     if (links.addr) a.push(addrBtn(links.addr, null, links.addrX) + dropNote(links.drop));
+    if (pos && pos.lat) a.push(uberBtn(pos, links.addr));
     if (links.tel) {
       // telSoft＝這支是 0507 代理號（안심번호），NAVER 搜尋會混進別家，只適合撥打
       const soft = links.telSoft;
@@ -154,9 +181,13 @@
       a.push(`<a class="bk nbk${few ? ' dim' : ''}" href="${nbook(links.nb)}" target="_blank" rel="noopener" title="${esc(tip)}">📅 NAVER 訂位${few ? `（${links.nbMin}人起）` : '・可選日期'}</a>`);
     }
     if (imgQuery) a.push(`<a href="${gimg(imgQuery)}" target="_blank" rel="noopener">📷 實景圖片</a>`);
-    // 有 NAVER 店家 id → 手機點了直接開 App 到「那一家」的頁面（沒裝 App 則開網頁版）
+    // 有 NAVER 店家 id → 手機點了直接開 App 到「那一家」的頁面（沒裝 App 則開網頁版）；
+    // 沒 id 但有座標 → 直接在 App 裡插旗（介面切成中文也不必搜尋）；都沒有才用關鍵字搜尋
     if (links.nid) a.push(nvLink('place', links.nid, '🗺️ NAVER・App直達'));
+    else if (pos && pos.lat) a.push(nvLink('coord', pos, '🗺️ NAVER・座標直達'));
     else if (links.n) a.push(nvLink('search', links.n, '🗺️ NAVER'));
+    // 從目前位置一鍵導航（大眾運輸）——也是座標，不吃搜尋
+    if (pos && pos.lat) a.push(nvLink('route', pos, '🧭 NAVER 導航到這'));
     return `<div class="links" onclick="event.stopPropagation()">${a.join('')}</div>`;
   }
   // 圖片搜尋關鍵字：優先用「對準清單品項」的精準韓文商品名，其次店名
@@ -1366,7 +1397,7 @@
       ${priceLine}${waitLine}${it.area ? buyLine : ''}${extraLine}${branchLine}
       <p class="desc">${esc(it.desc)}</p>
       ${orderHtml(it)}
-      ${linkRow(it.links, imgQ(it))}
+      ${linkRow(it.links, imgQ(it), posOfItem(it))}
     </div>`;
   }
 
@@ -1613,7 +1644,7 @@
     if (r.k === 'fixed') {
       const lk = r.links ? ` <a href="${gmap(r.links.g)}" target="_blank" rel="noopener">📍地圖</a>` +
         (r.links.o ? ` <a href="${esc(r.links.o)}" target="_blank" rel="noopener">🌐官網</a>` : '') : '';
-      const ad = r.links && r.links.addr ? `<div class="e-meta sub">${addrBtn(r.links.addr, '複製飯店地址')}</div>` : '';
+      const ad = r.links && r.links.addr ? `<div class="e-meta sub links-inline">${addrBtn(r.links.addr, '複製飯店地址')} ${uberBtn(HOTEL_POS, r.links.addr)}</div>` : '';
       return entryHtml(r.t, '固定', `<div class="e-name">${r.text}</div>${r.sub ? `<div class="e-meta sub">${esc(r.sub)}${lk}</div>` : ''}${ad}`, 'fixed');
     }
     if (r.k === 'trans') {
@@ -1634,7 +1665,7 @@
       const cfNote = (!r.pickup && cf) ? `<div class="e-meta sub">${r.t <= cf ? `✅ ${fmtT(cf)} 前到家（${cf === (CONFIG.curfew || {}).far ? '遠程日放寬標準' : '一般日標準'}）` : `⚠️ 比預定的 ${fmtT(cf)} 晚了 ${durTxt(r.t - cf)}${r.soft ? '——為了保留重點行程與晚餐，沒有再刪東西' : ''}`}</div>` : '';
       // 晚上叫車回飯店是最常用到地址的時候：這一列直接放飯店地址複製鈕
       const hAddr = ((CONFIG.trip.hotel || {}).links || {}).addr;
-      const hBtn = hAddr ? `<div class="e-meta sub">${addrBtn(hAddr, '複製飯店地址')}</div>` : '';
+      const hBtn = hAddr ? `<div class="e-meta sub links-inline">${addrBtn(hAddr, '複製飯店地址')} ${uberBtn(HOTEL_POS, hAddr)}</div>` : '';
       return entryHtml(fmtT(r.t), '返回', `<div class="e-name">${r.pickup ? '🏨 回飯店領行李，整理後前往機場' : '🏨 回到樂天飯店，今日行程結束'}</div>${cfNote}${hBtn}`, 'fixed hotelend');
     }
     if (r.k === 'store') {
@@ -1649,7 +1680,7 @@
         <div class="e-name">🛍️ ${esc(g.store.name)} ${g.pinnedStore ? '<span class="badge pin">📌 手動指定</span>' : ''}<span class="stay">⏳ 停留約${durTxt(r.stay)}</span></div>${earlyWarn}
         <div class="store-items">${g.items.map(piChip).join('')}</div><div class="pi-panel no-print" hidden></div>
         ${g.store.note ? `<div class="store-note">💡 ${esc(g.store.note)}</div>` : ''}${lateWarn}
-        ${linkRow(g.store.links, g.store.links && g.store.links.g)}
+        ${linkRow(g.store.links, g.store.links && g.store.links.g, posOfStore(g.store))}
         ${storeBar(g, day, r.si)}`, 'storestop');
     }
     if (r.k === 'd5shop') {
@@ -1657,13 +1688,13 @@
         return entryHtml(fmtT(r.t), SLOT_LABELS.d5shop, `
           <div class="e-name">🛍️ 西面最後採購：Olive Young 旗艦店＋樂天百貨／樂天超市 <span class="stay">⏳ 約${durTxt(r.stay)}</span></div>
           <div class="e-desc">美妝、伴手禮最後掃貨並辦理退稅（同店單筆滿 15,000₩ 即可退，多數專櫃可直接現場免稅價結帳；樂天百貨 1 樓有自動退稅機），採買完回飯店打包行李</div>
-          ${linkRow({ g: '올리브영 부산 서면점', n: '롯데백화점 부산본점' }, '올리브영 부산 서면점')}`, 'storestop');
+          ${linkRow({ g: '올리브영 부산 서면점', n: '롯데백화점 부산본점' }, '올리브영 부산 서면점', posOfStore(STORES.oy_seomyeon))}`, 'storestop');
       }
       const inner = r.stores.map(g => `
         <div class="store-b"><b>🛍️ ${esc(g.store.name)}</b>
           <div class="store-items">${g.items.map(piChip).join('')}</div><div class="pi-panel no-print" hidden></div>
           ${g.store.note ? `<div class="store-note">💡 ${esc(g.store.note)}</div>` : ''}
-          ${linkRow(g.store.links, g.store.links && g.store.links.g)}
+          ${linkRow(g.store.links, g.store.links && g.store.links.g, posOfStore(g.store))}
           <div class="e-edit no-print"><span class="ed-lab">這間店</span><select class="ed-sel" data-stday="${g.storeId}">
             <option value="4" selected>留在 Day 5 最終採購</option>
             ${[0, 1, 2, 3].map(i => `<option value="${i}">提前到 Day ${i + 1} 買</option>`).join('')}
@@ -1681,7 +1712,7 @@
       const a = cell.anchor;
       return entryHtml(fmtT(r.t), label, `
         <div class="e-name">${a.shopping ? '🛍️' : '🚶'} ${esc(a.name)} <span class="badge free">${a.shopping ? '採購時間' : '免費散步'}</span> <span class="stay">⏳ 約${durTxt(r.stay)}</span></div>
-        <div class="e-desc">${esc(a.desc)}</div>${linkRow(a.links, a.links && a.links.g)}
+        <div class="e-desc">${esc(a.desc)}</div>${linkRow(a.links, a.links && a.links.g, posOfItem(a))}
         <div class="e-edit no-print"><span class="ed-lab">調整</span>${moveBtns(day, r.si)}
           <button class="ed del" data-androp="${day._idx}" title="移除這段自動填充的散步/採購時間（多出來的時間變自由時間；想恢復按上方「還原自動安排」）">✕ 移除</button></div>`);
     }
@@ -1699,7 +1730,7 @@
       ${siblings(it).length ? `<div class="e-meta sub">🏪 走不到也沒關係：${siblings(it).map(s => esc(s.area)).join('、')}也有分店</div>` : ''}
       ${it.close != null && r.end > it.close ? `<div class="e-meta warnline">⚠️ 這家約 ${fmtT(it.close)} 打烊，此時段可能來不及——建議提前或改選同品牌其他分店</div>` : ''}
       ${atHtml(r)}${batchHtml(r)}${orderHtml(it)}
-      <div class="e-desc">${esc(it.desc)}</div>${planHtml(it, r.t)}${linkRow(it.links, imgQ(it))}
+      <div class="e-desc">${esc(it.desc)}</div>${planHtml(it, r.t)}${linkRow(it.links, imgQ(it), posOfItem(it))}
       ${editBar(it, day, r.slotKey, cell, r.si)}`);
   }
 
@@ -2003,7 +2034,7 @@
                 title="${f.fits ? '這天還有空檔，排得下' : '這天已經排滿，加進去會把當天某一項換到備選'}">✚ Day${f.i + 1}${
                   k === 0 ? (f.fits ? '（順路建議）' : '（建議・會換掉一項）') : (f.fits ? '' : '⚠️')}</button>`).join('')
             : '<span class="bk-none">這幾天店家都公休，排不進去</span>';
-          return `<div class="bk-item"><div class="bk-main">${ci.icon} ${esc(it.name)}｜💰 ${esc(it.price || '')} ${linkRow(it.links, imgQ(it))}</div>
+          return `<div class="bk-item"><div class="bk-main">${ci.icon} ${esc(it.name)}｜💰 ${esc(it.price || '')} ${linkRow(it.links, imgQ(it), posOfItem(it))}</div>
             <div class="bk-act no-print">${btns}</div></div>`;
         }).join('')}</div>` : '';
       const dayTips = {
@@ -2084,7 +2115,7 @@
             const ci = catInfo(it);
             const safeTxt = it.safe === 'warn' ? '<span class="badge warn">⚠️ 成分含肉禁帶</span>' :
               it.safe === 'ok-check' ? '<span class="badge note">須託運</span>' : '';
-            return `<div class="shop-item"><div><b>${ci.icon} ${esc(it.name)}</b> ${safeTxt}<div class="e-meta sub">🏬 ${esc(it.buy)}｜💰 ${esc(it.price)}</div></div>${linkRow(it.links, imgQ(it))}</div>`;
+            return `<div class="shop-item"><div><b>${ci.icon} ${esc(it.name)}</b> ${safeTxt}<div class="e-meta sub">🏬 ${esc(it.buy)}｜💰 ${esc(it.price)}</div></div>${linkRow(it.links, imgQ(it), posOfItem(it))}</div>`;
           }).join('')}</div>`;
         }).join('')}
         <div class="tip customs">🛃 <b>台灣海關提醒：</b>所有肉類製品（肉乾、火腿腸、含肉塊泡麵）嚴禁入境，首次查獲罰 NT$20 萬；泡菜、芝麻油、果醬等液體/發酵品必須託運；純海鮮加工品（魚糕、海苔）可安心帶。<b>藥局藥妝：</b>痘痘藥、去疤膏、貼布等西藥「每種最多 12 件、合計 36 件」（錠狀保健品同 12/36），僅限自用——任何形式轉售或代購都違反藥事法（最高罰 NT$200 萬）。不確定就走紅線主動申報，申報不罰。</div>
@@ -2102,7 +2133,7 @@
           <div class="sc"><div class="sc-t">✈️ 去程</div><div>${t.outbound.date}</div><div>${t.outbound.dep}</div><div>${t.outbound.arr}</div></div>
           <div class="sc"><div class="sc-t">🏨 住宿</div><div>${t.hotel.name}</div><div>${esc(t.hotel.area)}</div>
             <div><a href="${gmap(t.hotel.links.g)}" target="_blank" rel="noopener">📍 Google地圖</a>　<a href="${esc(t.hotel.links.o)}" target="_blank" rel="noopener">🌐 官網</a></div>
-            ${t.hotel.links.addr ? `<div>${addrBtn(t.hotel.links.addr, '複製飯店地址')}</div>` : ''}</div>
+            ${t.hotel.links.addr ? `<div class="links-inline">${addrBtn(t.hotel.links.addr, '複製飯店地址')} ${uberBtn(HOTEL_POS, t.hotel.links.addr)}</div>` : ''}</div>
           <div class="sc"><div class="sc-t">✈️ 回程</div><div>${t.inbound.date}</div><div>${t.inbound.dep}</div><div>${t.inbound.arr}</div></div>
           <div class="sc cost"><div class="sc-t">💰 預估花費（每人）</div><div class="big">${money(est)}</div><div>餐飲＋門票，不含機酒/交通/購物</div>
             <div class="sub">🚕 市區交通預估 ${money(plan.transTotal)}（2人合計）</div>
@@ -2743,7 +2774,7 @@
         b.innerHTML = '✅ 地址已複製';
         b.classList.add('done');
         setTimeout(() => { b.innerHTML = old; b.classList.remove('done'); }, 2200);
-        toast(`已複製「${addr}」——開 Uber／Kakao T，貼到目的地搜尋`);
+        toast(`已複製「${addr}」——貼到 Uber／Kakao T 目的地。NAVER 搜不到就別搜：按藍色「NAVER・App直達」或黑色「Uber 直接設目的地」都不用打字`);
       };
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(addr).then(done).catch(() => fallbackCopy(addr, done));
