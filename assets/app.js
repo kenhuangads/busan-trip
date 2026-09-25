@@ -119,10 +119,18 @@
   };
 
   const gimg = q => 'https://www.google.com/search?udm=2&q=' + encodeURIComponent(q); // Google 圖片搜尋
+  // 韓文地址一鍵複製：Uber／Kakao T 打中文常找不到，貼 NAVER 登記的「道路名地址」最穩。
+  // 按鈕直接把地址印出來，不用貼也能把手機拿給司機看。
+  // addrX＝樓層／建物（只顯示不複製，下車後找店用）；drop＝最佳下車點與省時提醒（大型景點才有）
+  const addrBtn = (addr, label, addrX) => addr
+    ? `<button type="button" class="addrbtn" data-addr="${esc(addr)}" title="點一下複製韓文地址——貼到 Uber／Kakao T 的目的地搜尋一貼就中（NAVER 官方登記的道路名地址，已逐一核對）">🚕 ${esc(addr)}${addrX ? ` <i>${esc(addrX)}</i>` : ''} <em>${label || '複製地址'}</em></button>`
+    : '';
+  const dropNote = drop => drop ? `<span class="drop">🚖 下車點：${esc(drop)}</span>` : '';
   function linkRow(links, imgQuery) {
     if (!links && !imgQuery) return '';
     links = links || {};
     const a = [];
+    if (links.addr) a.push(addrBtn(links.addr, null, links.addrX) + dropNote(links.drop));
     if (links.tel) {
       // telSoft＝這支是 0507 代理號（안심번호），NAVER 搜尋會混進別家，只適合撥打
       const soft = links.telSoft;
@@ -808,7 +816,7 @@
       rows.push({ k: 'fixed', t: '08:10', text: `✈️ ${t.outbound.dep}（${t.outbound.airline}）`, sub: '建議 06:10 前抵達機場辦理報到與托運' });
       rows.push({ k: 'fixed', t: '11:30', text: '🛬 抵達金海國際機場', sub: '韓國時間比台灣快 1 小時｜入境後可先領 WOWPASS／T-money' });
       rows.push({ k: 'fixed', t: '12:15', text: '🚉 機場 → 西面樂天飯店', sub: '機場輕軌轉地鐵2號線約 40 分（每人約NT$40）／計程車約 25 分（約NT$430-540）' });
-      rows.push({ k: 'fixed', t: '13:15', text: `🏨 ${t.hotel.name} 寄放行李`, sub: '15:00 後正式入住｜' + t.hotel.area, links: { g: t.hotel.links.g, o: t.hotel.links.o } });
+      rows.push({ k: 'fixed', t: '13:15', text: `🏨 ${t.hotel.name} 寄放行李`, sub: '15:00 後正式入住｜' + t.hotel.area, links: { g: t.hotel.links.g, o: t.hotel.links.o, addr: t.hotel.links.addr } });
     }
     if (day.key === 'd5') {
       rows.push({ k: 'fixed', t: '08:30', text: '🧳 整理行李・辦理退房', sub: '行李寄放櫃台，採買完回飯店領取' });
@@ -1605,7 +1613,8 @@
     if (r.k === 'fixed') {
       const lk = r.links ? ` <a href="${gmap(r.links.g)}" target="_blank" rel="noopener">📍地圖</a>` +
         (r.links.o ? ` <a href="${esc(r.links.o)}" target="_blank" rel="noopener">🌐官網</a>` : '') : '';
-      return entryHtml(r.t, '固定', `<div class="e-name">${r.text}</div>${r.sub ? `<div class="e-meta sub">${esc(r.sub)}${lk}</div>` : ''}`, 'fixed');
+      const ad = r.links && r.links.addr ? `<div class="e-meta sub">${addrBtn(r.links.addr, '複製飯店地址')}</div>` : '';
+      return entryHtml(r.t, '固定', `<div class="e-name">${r.text}</div>${r.sub ? `<div class="e-meta sub">${esc(r.sub)}${lk}</div>` : ''}${ad}`, 'fixed');
     }
     if (r.k === 'trans') {
       return `<div class="entry trans"><div class="t"><span class="clock sm">${fmtT(r.dep)}</span><span class="slotlab">出發</span></div>
@@ -1623,7 +1632,10 @@
     if (r.k === 'hotel') {
       const cf = r.curfew;
       const cfNote = (!r.pickup && cf) ? `<div class="e-meta sub">${r.t <= cf ? `✅ ${fmtT(cf)} 前到家（${cf === (CONFIG.curfew || {}).far ? '遠程日放寬標準' : '一般日標準'}）` : `⚠️ 比預定的 ${fmtT(cf)} 晚了 ${durTxt(r.t - cf)}${r.soft ? '——為了保留重點行程與晚餐，沒有再刪東西' : ''}`}</div>` : '';
-      return entryHtml(fmtT(r.t), '返回', `<div class="e-name">${r.pickup ? '🏨 回飯店領行李，整理後前往機場' : '🏨 回到樂天飯店，今日行程結束'}</div>${cfNote}`, 'fixed hotelend');
+      // 晚上叫車回飯店是最常用到地址的時候：這一列直接放飯店地址複製鈕
+      const hAddr = ((CONFIG.trip.hotel || {}).links || {}).addr;
+      const hBtn = hAddr ? `<div class="e-meta sub">${addrBtn(hAddr, '複製飯店地址')}</div>` : '';
+      return entryHtml(fmtT(r.t), '返回', `<div class="e-name">${r.pickup ? '🏨 回飯店領行李，整理後前往機場' : '🏨 回到樂天飯店，今日行程結束'}</div>${cfNote}${hBtn}`, 'fixed hotelend');
     }
     if (r.k === 'store') {
       const g = r.g;
@@ -2089,7 +2101,8 @@
         <div class="summary-cards">
           <div class="sc"><div class="sc-t">✈️ 去程</div><div>${t.outbound.date}</div><div>${t.outbound.dep}</div><div>${t.outbound.arr}</div></div>
           <div class="sc"><div class="sc-t">🏨 住宿</div><div>${t.hotel.name}</div><div>${esc(t.hotel.area)}</div>
-            <div><a href="${gmap(t.hotel.links.g)}" target="_blank" rel="noopener">📍 Google地圖</a>　<a href="${esc(t.hotel.links.o)}" target="_blank" rel="noopener">🌐 官網</a></div></div>
+            <div><a href="${gmap(t.hotel.links.g)}" target="_blank" rel="noopener">📍 Google地圖</a>　<a href="${esc(t.hotel.links.o)}" target="_blank" rel="noopener">🌐 官網</a></div>
+            ${t.hotel.links.addr ? `<div>${addrBtn(t.hotel.links.addr, '複製飯店地址')}</div>` : ''}</div>
           <div class="sc"><div class="sc-t">✈️ 回程</div><div>${t.inbound.date}</div><div>${t.inbound.dep}</div><div>${t.inbound.arr}</div></div>
           <div class="sc cost"><div class="sc-t">💰 預估花費（每人）</div><div class="big">${money(est)}</div><div>餐飲＋門票，不含機酒/交通/購物</div>
             <div class="sub">🚕 市區交通預估 ${money(plan.transTotal)}（2人合計）</div>
@@ -2391,7 +2404,7 @@
     L.push(`🌊 2026 釜山五天四夜｜客製行程（${curVersionName()}）`);
     L.push(`✈️ 去程 ${t.outbound.date} ${t.outbound.dep} → ${t.outbound.arr}`);
     L.push(`✈️ 回程 ${t.inbound.date} ${t.inbound.dep} → ${t.inbound.arr}`);
-    L.push(`🏨 ${t.hotel.name}（西面站）`);
+    L.push(`🏨 ${t.hotel.name}（西面站）${t.hotel.links.addr ? `｜🚕 ${t.hotel.links.addr}` : ''}`);
     plan.days.forEach((d, i) => {
       L.push('────────────');
       L.push(`📅 Day ${i + 1} ${d.date}｜${d.theme}`);
@@ -2717,6 +2730,24 @@
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(tel).then(done).catch(() => fallbackCopy(tel, done));
       } else fallbackCopy(tel, done);
+    }, true);
+
+    /* 韓文地址一鍵複製（叫車用）：同樣走捕獲階段，勾選頁、結果頁、回飯店列都吃這一個 */
+    document.addEventListener('click', e => {
+      const b = e.target.closest('[data-addr]');
+      if (!b) return;
+      e.preventDefault(); e.stopPropagation();
+      const addr = b.dataset.addr;
+      const done = () => {
+        const old = b.innerHTML;
+        b.innerHTML = '✅ 地址已複製';
+        b.classList.add('done');
+        setTimeout(() => { b.innerHTML = old; b.classList.remove('done'); }, 2200);
+        toast(`已複製「${addr}」——開 Uber／Kakao T，貼到目的地搜尋`);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(addr).then(done).catch(() => fallbackCopy(addr, done));
+      } else fallbackCopy(addr, done);
     }, true);
     $('#tabs').addEventListener('click', e => {
       const b = e.target.closest('[data-tab]'); if (!b) return;

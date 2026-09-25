@@ -54,6 +54,8 @@ h2.sec small{font-weight:400;color:var(--ink3);font-size:12.5px}
 .it a.gg{background:#f2f7ff;color:var(--deep);border:1px solid #c9dcf5}
 .it .ck{font-size:12px;font-weight:700;border-radius:999px;padding:5px 10px;border:1.5px solid var(--line);background:#fff;color:var(--ink3);white-space:nowrap}
 .it .ck.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.it .ck.ad{background:#fff6d6;border-color:#efd98a;color:#6b4d00;white-space:normal;text-align:left}
+.it .ck.ad.on{background:#d99a00;border-color:#d99a00;color:#fff}
 .empty{color:var(--ink3);text-align:center;padding:26px 0;font-size:13.5px}
 footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
 @media print{.ctl,.btns{display:none}}
@@ -119,7 +121,7 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
 
 <footer>資料與行程工具：<a href="index.html">2026 釜山五天四夜</a>｜版本 <span id="ver"></span></footer>
 
-<script src="assets/data.js?v=20260923a"></script>
+<script src="assets/data.js?v=20260925a"></script>
 <script>
 (function () {
   'use strict';
@@ -176,12 +178,13 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
   const clTxt = c => (CLUSTERS[c] && CLUSTERS[c].short) || '';
   const rows = [];
   rows.push({ key: 'hotel', sec: 'spot', icon: '🏨', name: HOTEL.name, kr: '롯데호텔 부산', area: '西面站',
-    lat: HOTEL.lat, lng: HOTEL.lng, cat: '住宿', zone: '西面', g: '롯데호텔 부산', nvKind: 'search', nvVal: '롯데호텔 부산', note: '住宿（已訂好）' });
+    lat: HOTEL.lat, lng: HOTEL.lng, cat: '住宿', zone: '西面', g: '롯데호텔 부산', nvKind: 'search', nvVal: '롯데호텔 부산', note: '住宿（已訂好）',
+    addr: ((CONFIG.trip.hotel || {}).links || {}).addr || '' });
   SPOTS.forEach(s => {
     const m = META[s.id] || {}, L = s.links || {};
     rows.push({ key: s.id, sec: 'spot', icon: '🗼', name: s.name, kr: s.kr || '', area: clTxt(s.cluster),
       lat: m.lat, lng: m.lng, cat: '景點', zone: clTxt(s.cluster), g: L.g || s.kr || s.name,
-      nvKind: L.nid ? 'place' : 'search', nvVal: L.nid || L.n || s.kr || s.name,
+      nvKind: L.nid ? 'place' : 'search', nvVal: L.nid || L.n || s.kr || s.name, addr: L.addr || '',
       note: (s.desc || '').slice(0, 60) });
   });
   FOODS.forEach(f => {
@@ -190,7 +193,7 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
     rows.push({ key: f.id, sec: 'food', icon: (FOOD_CATS[f.cat] && FOOD_CATS[f.cat].icon) || '🍜',
       name: f.name, kr: f.kr || '', area: f.area || clTxt(f.cluster),
       lat: m.lat, lng: m.lng, cat: cat, zone: clTxt(f.cluster), g: L.g || f.kr || f.name,
-      nvKind: L.nid ? 'place' : 'search', nvVal: L.nid || L.n || f.kr || f.name,
+      nvKind: L.nid ? 'place' : 'search', nvVal: L.nid || L.n || f.kr || f.name, addr: L.addr || '',
       note: (f.price ? f.price + '｜' : '') + (f.desc || '').slice(0, 60) });
   });
   Object.entries(STORES).forEach(([k, s]) => {
@@ -198,7 +201,7 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
     const L = s.links || {};
     rows.push({ key: 'st:' + k, sec: 'store', icon: '🛍️', name: s.name, kr: L.n || '', area: zoneTxt(s.zone),
       lat: s.lat, lng: s.lng, cat: '購物門市', zone: zoneTxt(s.zone), g: L.g || L.n || s.name,
-      nvKind: L.nid ? 'place' : 'search', nvVal: L.nid || L.n || s.name,
+      nvKind: L.nid ? 'place' : 'search', nvVal: L.nid || L.n || s.name, addr: L.addr || '',
       note: (s.note || '').slice(0, 70) });
   });
 
@@ -257,6 +260,7 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
             <a class="go gg" href="${gmap(r.g)}" target="_blank" rel="noopener">Google</a>
             <button class="ck ${d.n ? 'on' : ''}" data-ck="n">N ${d.n ? '✓' : '已存?'}</button>
             <button class="ck ${d.g ? 'on' : ''}" data-ck="g">G ${d.g ? '✓' : '已存?'}</button>
+            ${r.addr ? `<button class="ck ad" data-addr="${esc(r.addr)}" title="複製韓文地址，貼到 Uber／Kakao T 目的地">🚕 ${esc(r.addr)}</button>` : ''}
           </div></div>`;
       });
     });
@@ -268,6 +272,14 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
   }
 
   $('#list').addEventListener('click', e => {
+    const ab = e.target.closest('button[data-addr]');
+    if (ab) { // 韓文地址一鍵複製（叫車用）
+      const addr = ab.dataset.addr, old = ab.innerHTML;
+      const ok = () => { ab.innerHTML = '✅ 地址已複製'; ab.classList.add('on'); setTimeout(() => { ab.innerHTML = old; ab.classList.remove('on'); }, 2200); };
+      const fb = () => { const ta = document.createElement('textarea'); ta.value = addr; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); ok(); } catch (x) { alert('複製失敗，請手動長按選取'); } document.body.removeChild(ta); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(addr).then(ok).catch(fb); else fb();
+      return;
+    }
     const b = e.target.closest('button[data-ck]');
     if (!b) return;
     const key = b.closest('.it').dataset.key, which = b.dataset.ck;
