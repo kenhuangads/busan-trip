@@ -152,6 +152,18 @@
   };
   const posOfStore = st => st && st.lat ? { lat: st.lat, lng: st.lng, name: (st.links && st.links.n) || st.name } : null;
   const HOTEL_POS = { lat: HOTEL.lat, lng: HOTEL.lng, name: '롯데호텔 부산' };
+  /* 列印／PDF 用短網址：iPhone 用「列印預覽」存出來的 PDF 會把超連結拿掉（iOS 已知限制），
+     但幾乎所有 PDF 閱讀器都會把「看得到的網址文字」自動變成可點——所以每一站印一行
+     純 ASCII 的座標式短網址（螢幕上隱藏，列印與 PDF 版面才顯示）。 */
+  const printLinks = (links, pos) => {
+    if (!pos || !pos.lat) return '';
+    links = links || {};
+    const nv = links.nid ? 'https://map.naver.com/p/entry/place/' + links.nid : `https://map.naver.com/p?c=${pos.lng},${pos.lat},17,0,0,0,dh`;
+    const gg = `https://maps.google.com/?q=${pos.lat},${pos.lng}`;
+    const ub = `https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[latitude]=${pos.lat}&dropoff[longitude]=${pos.lng}`;
+    const a = u => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`;
+    return `<div class="print-links">🔗 NAVER ${a(nv)}　Google ${a(gg)}　Uber ${a(ub)}</div>`;
+  };
   function linkRow(links, imgQuery, pos) {
     if (!links && !imgQuery) return '';
     links = links || {};
@@ -190,7 +202,7 @@
     else if (links.n) a.push(nvLink('search', links.n, '🗺️ NAVER'));
     // 從目前位置一鍵導航（大眾運輸）——也是座標，不吃搜尋
     if (pos && pos.lat) a.push(nvLink('route', pos, '🧭 NAVER 導航到這'));
-    return `<div class="links" onclick="event.stopPropagation()">${a.join('')}</div>`;
+    return `<div class="links" onclick="event.stopPropagation()">${a.join('')}</div>${printLinks(links, pos)}`;
   }
   // 圖片搜尋關鍵字：優先用「對準清單品項」的精準韓文商品名，其次店名
   // 行程裡的採購清單：每個品項是可點的晶片，點了在同一區塊下方展開詳情
@@ -1646,7 +1658,7 @@
     if (r.k === 'fixed') {
       const lk = r.links ? ` <a href="${gmap(r.links.g + (r.links.addr ? ' ' + fullAddr(r.links.addr) : ''))}" target="_blank" rel="noopener">📍地圖</a>` +
         (r.links.o ? ` <a href="${esc(r.links.o)}" target="_blank" rel="noopener">🌐官網</a>` : '') : '';
-      const ad = r.links && r.links.addr ? `<div class="e-meta sub links-inline">${addrBtn(r.links.addr, '複製飯店地址')} ${uberBtn(HOTEL_POS, r.links.addr)}</div>` : '';
+      const ad = r.links && r.links.addr ? `<div class="e-meta sub links-inline">${addrBtn(r.links.addr, '複製飯店地址')} ${uberBtn(HOTEL_POS, r.links.addr)}</div>${printLinks(CONFIG.trip.hotel.links, HOTEL_POS)}` : '';
       return entryHtml(r.t, '固定', `<div class="e-name">${r.text}</div>${r.sub ? `<div class="e-meta sub">${esc(r.sub)}${lk}</div>` : ''}${ad}`, 'fixed');
     }
     if (r.k === 'trans') {
@@ -1667,7 +1679,7 @@
       const cfNote = (!r.pickup && cf) ? `<div class="e-meta sub">${r.t <= cf ? `✅ ${fmtT(cf)} 前到家（${cf === (CONFIG.curfew || {}).far ? '遠程日放寬標準' : '一般日標準'}）` : `⚠️ 比預定的 ${fmtT(cf)} 晚了 ${durTxt(r.t - cf)}${r.soft ? '——為了保留重點行程與晚餐，沒有再刪東西' : ''}`}</div>` : '';
       // 晚上叫車回飯店是最常用到地址的時候：這一列直接放飯店地址複製鈕
       const hAddr = ((CONFIG.trip.hotel || {}).links || {}).addr;
-      const hBtn = hAddr ? `<div class="e-meta sub links-inline">${addrBtn(hAddr, '複製飯店地址')} ${uberBtn(HOTEL_POS, hAddr)}</div>` : '';
+      const hBtn = hAddr ? `<div class="e-meta sub links-inline">${addrBtn(hAddr, '複製飯店地址')} ${uberBtn(HOTEL_POS, hAddr)}</div>${printLinks(CONFIG.trip.hotel.links, HOTEL_POS)}` : '';
       return entryHtml(fmtT(r.t), '返回', `<div class="e-name">${r.pickup ? '🏨 回飯店領行李，整理後前往機場' : '🏨 回到樂天飯店，今日行程結束'}</div>${cfNote}${hBtn}`, 'fixed hotelend');
     }
     if (r.k === 'store') {
@@ -2135,7 +2147,7 @@
           <div class="sc"><div class="sc-t">✈️ 去程</div><div>${t.outbound.date}</div><div>${t.outbound.dep}</div><div>${t.outbound.arr}</div></div>
           <div class="sc"><div class="sc-t">🏨 住宿</div><div>${t.hotel.name}</div><div>${esc(t.hotel.area)}</div>
             <div><a href="${gmap(t.hotel.links.g + (t.hotel.links.addr ? ' ' + fullAddr(t.hotel.links.addr) : ''))}" target="_blank" rel="noopener">📍 Google地圖</a>　<a href="${esc(t.hotel.links.o)}" target="_blank" rel="noopener">🌐 官網</a></div>
-            ${t.hotel.links.addr ? `<div class="links-inline">${addrBtn(t.hotel.links.addr, '複製飯店地址')} ${uberBtn(HOTEL_POS, t.hotel.links.addr)}</div>` : ''}</div>
+            ${t.hotel.links.addr ? `<div class="links-inline">${addrBtn(t.hotel.links.addr, '複製飯店地址')} ${uberBtn(HOTEL_POS, t.hotel.links.addr)}</div>${printLinks(t.hotel.links, HOTEL_POS)}` : ''}</div>
           <div class="sc"><div class="sc-t">✈️ 回程</div><div>${t.inbound.date}</div><div>${t.inbound.dep}</div><div>${t.inbound.arr}</div></div>
           <div class="sc cost"><div class="sc-t">💰 預估花費（每人）</div><div class="big">${money(est)}</div><div>餐飲＋門票，不含機酒/交通/購物</div>
             <div class="sub">🚕 市區交通預估 ${money(plan.transTotal)}（2人合計）</div>
@@ -2150,6 +2162,7 @@
           <button id="copyLink">🔗 複製行程連結分享</button>
           <button id="sheetBtn" class="gsbtn">📊 Google 試算表</button>
           <button id="printBtn">🖨️ 列印／存 PDF</button>
+          <button id="pdfBtn" title="iPhone 請用這個：切成 PDF 版面後，Safari 分享 → 選項 → PDF → 儲存到檔案，連結才點得動">📄 PDF 版面（iPhone 分享用）</button>
           <a class="r-abtn" href="savelist.html">📍 存進 Google／NAVER 地圖</a>
           ${(Object.keys(state.pins).length || Object.keys(state.stPins).length || Object.keys(state.ord).length || state.dayCl || Object.keys(state.exSt).length || Object.keys(state.exAn).length) ? `<button id="resetPins" class="rst">↩️ 還原自動安排（${[
             (Object.keys(state.pins).length + Object.keys(state.stPins).length) ? '已調整 ' + (Object.keys(state.pins).length + Object.keys(state.stPins).length) + ' 項' : '',
@@ -2186,6 +2199,20 @@
       closed.forEach(d => { d.open = true; });
       window.print();
       closed.forEach(d => { d.open = false; });
+    });
+    /* PDF 版面：iPhone Safari「分享 → 選項 → PDF」走的是螢幕版面（不吃 @media print），
+       所以用 body.pdfmode 把列印規則套到螢幕上——藏掉操作鈕、展開摺疊區、顯示每站短網址 */
+    $('#pdfBtn').addEventListener('click', () => {
+      document.body.classList.add('pdfmode');
+      $$('#result-inner details:not([open])').forEach(d => { d.open = true; });
+      let x = $('#pdfExit');
+      if (!x) {
+        x = document.createElement('button'); x.id = 'pdfExit'; x.textContent = '✕ 離開 PDF 版面';
+        x.addEventListener('click', () => { document.body.classList.remove('pdfmode'); x.remove(); });
+        document.body.appendChild(x);
+      }
+      window.scrollTo(0, 0);
+      toast('PDF 版面已開：Safari 按「分享」→ 網頁標題下的「選項」→ 選 PDF → 儲存到檔案。每一站都印有短網址，PDF 裡點得動');
     });
     $('#sheetBtn').addEventListener('click', () => { $('#gsMask').style.display = ''; });
     bindSheetModal(plan);

@@ -7,7 +7,7 @@
 
 const CONFIG = {
   baseUrl: 'https://kenhuangads.github.io/busan-trip/',
-  build: '20260925c',   // 版本標示：手機看到的號碼跟這裡不同就是載到舊版（重新整理即可）
+  build: '20260925d',   // 版本標示：手機看到的號碼跟這裡不同就是載到舊版（重新整理即可）
   rateNote: '價格換算基準：1,000韓元 ≈ NT$21.5（2026年7月匯率）。所有金額為 2026 年估算平均範圍，實際以現場為準。',
   people: 2,      // 同行人數：用來判斷「N 人起」的訂位門檻按不按得動
   minSpots: 3,
@@ -29,7 +29,7 @@ const CONFIG = {
       name: '釜山樂天飯店 Lotte Hotel Busan',
       area: '西面站（地鐵1/2號線交會）旁，連通樂天百貨',
       // addr＝NAVER 登記的道路名地址（place id 11577921 核對），叫車貼這個
-      links: { addr: '부산 부산진구 가야대로 772', g: '롯데호텔 부산', n: '롯데호텔 부산', o: 'https://www.lottehotel.com/busan-hotel/' }
+      links: { addr: '부산 부산진구 가야대로 772', nid: '11577921', g: '롯데호텔 부산', n: '롯데호텔 부산', o: 'https://www.lottehotel.com/busan-hotel/' }
     }
   }
 };

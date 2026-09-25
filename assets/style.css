@@ -382,9 +382,21 @@ small { color: var(--ink-3); font-weight: 400; }
   #result { display: block !important; }
   .day, .shoplist, .sc, .ov-wrap { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
   .entry.trans, .entry.free, .entry.storestop { break-inside: avoid; }
-  .links a { color: #333; }
+  .links a { color: #1a4fa3; text-decoration: underline; }
   .hero { display: none; }
+  .print-links { display: block; }
 }
+/* 列印／PDF 用短網址列：螢幕隱藏，列印與 PDF 版面才出現（純 ASCII，閱讀器會自動變成可點） */
+.print-links { display: none; font: 9.5px/1.55 ui-monospace, Menlo, Consolas, monospace; color: #1a4fa3; word-break: break-all; margin-top: 3px; }
+.print-links a { color: #1a4fa3; text-decoration: underline; }
+/* PDF 版面（iPhone：Safari 分享→選項→PDF 走螢幕版面，不吃 @media print，所以把同一套規則掛在 body.pdfmode） */
+body.pdfmode .no-print, body.pdfmode #bar, body.pdfmode .controls, body.pdfmode #toast, body.pdfmode .e-edit,
+body.pdfmode .pi-panel, body.pdfmode .day-swap, body.pdfmode #updbar, body.pdfmode a.uber, body.pdfmode .hero { display: none !important; }
+body.pdfmode .print-links { display: block; font-size: 10.5px; }
+body.pdfmode .links a { text-decoration: underline; }
+body.pdfmode .day, body.pdfmode .shoplist, body.pdfmode .sc, body.pdfmode .ov-wrap { box-shadow: none; border: 1px solid #ddd; }
+#pdfExit { position: fixed; right: 12px; bottom: 14px; z-index: 70; background: #1d2733; color: #fff; border: none; border-radius: 999px; padding: 9px 14px; font-size: 13px; font-weight: 700; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+@media print { #pdfExit { display: none; } }
 
 /* ── v5：行程手動調整列 ───────────── */
 .e-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--line); }
