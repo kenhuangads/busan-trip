@@ -165,7 +165,9 @@
         ? '這是店家的代理號碼（0507 안심번호），可以直接撥打；但拿去 NAVER 搜尋會跳出別家，找店請按旁邊的「NAVER・App直達」'
         : '點一下複製電話——貼到 NAVER 地圖搜尋，一貼就只跳出這一家'}">📞 ${esc(links.tel)} <em>${soft ? '撥打用' : '複製'}</em></button>`);
     }
-    if (links.g) a.push(`<a href="${gmap(links.g)}" target="_blank" rel="noopener">📍 Google地圖</a>`);
+    // Google 用「店名＋核對過的地址」一起搜：連鎖店不會跳到別的分店；名字對不上時至少落在正確地址。
+    // gx＝Google 根本沒有這家的店家頁（用店名會跳到別的分店）→ 只用地址搜，落在正確位置
+    if (links.g || (links.gx && links.addr)) a.push(`<a href="${gmap(links.gx && links.addr ? fullAddr(links.addr) : links.g + (links.addr ? ' ' + fullAddr(links.addr) : ''))}" target="_blank" rel="noopener">📍 Google地圖</a>`);
     if (links.zh) a.push(`<a href="${esc(links.zh)}" target="_blank" rel="noopener">🇹🇼 繁中介紹</a>`);
     if (links.o) a.push(`<a href="${esc(links.o)}" target="_blank" rel="noopener">🌐 官網／介紹</a>`);
     if (links.s) a.push(`<a href="${gsearch(links.s)}" target="_blank" rel="noopener">🔎 商品介紹</a>`);
@@ -1642,7 +1644,7 @@
   function rowHtml(r, day) {
     // day._idx 由 renderResult 指派
     if (r.k === 'fixed') {
-      const lk = r.links ? ` <a href="${gmap(r.links.g)}" target="_blank" rel="noopener">📍地圖</a>` +
+      const lk = r.links ? ` <a href="${gmap(r.links.g + (r.links.addr ? ' ' + fullAddr(r.links.addr) : ''))}" target="_blank" rel="noopener">📍地圖</a>` +
         (r.links.o ? ` <a href="${esc(r.links.o)}" target="_blank" rel="noopener">🌐官網</a>` : '') : '';
       const ad = r.links && r.links.addr ? `<div class="e-meta sub links-inline">${addrBtn(r.links.addr, '複製飯店地址')} ${uberBtn(HOTEL_POS, r.links.addr)}</div>` : '';
       return entryHtml(r.t, '固定', `<div class="e-name">${r.text}</div>${r.sub ? `<div class="e-meta sub">${esc(r.sub)}${lk}</div>` : ''}${ad}`, 'fixed');
@@ -2132,7 +2134,7 @@
         <div class="summary-cards">
           <div class="sc"><div class="sc-t">✈️ 去程</div><div>${t.outbound.date}</div><div>${t.outbound.dep}</div><div>${t.outbound.arr}</div></div>
           <div class="sc"><div class="sc-t">🏨 住宿</div><div>${t.hotel.name}</div><div>${esc(t.hotel.area)}</div>
-            <div><a href="${gmap(t.hotel.links.g)}" target="_blank" rel="noopener">📍 Google地圖</a>　<a href="${esc(t.hotel.links.o)}" target="_blank" rel="noopener">🌐 官網</a></div>
+            <div><a href="${gmap(t.hotel.links.g + (t.hotel.links.addr ? ' ' + fullAddr(t.hotel.links.addr) : ''))}" target="_blank" rel="noopener">📍 Google地圖</a>　<a href="${esc(t.hotel.links.o)}" target="_blank" rel="noopener">🌐 官網</a></div>
             ${t.hotel.links.addr ? `<div class="links-inline">${addrBtn(t.hotel.links.addr, '複製飯店地址')} ${uberBtn(HOTEL_POS, t.hotel.links.addr)}</div>` : ''}</div>
           <div class="sc"><div class="sc-t">✈️ 回程</div><div>${t.inbound.date}</div><div>${t.inbound.dep}</div><div>${t.inbound.arr}</div></div>
           <div class="sc cost"><div class="sc-t">💰 預估花費（每人）</div><div class="big">${money(est)}</div><div>餐飲＋門票，不含機酒/交通/購物</div>

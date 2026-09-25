@@ -121,7 +121,7 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
 
 <footer>資料與行程工具：<a href="index.html">2026 釜山五天四夜</a>｜版本 <span id="ver"></span></footer>
 
-<script src="assets/data.js?v=20260925b"></script>
+<script src="assets/data.js?v=20260925c"></script>
 <script>
 (function () {
   'use strict';
@@ -257,7 +257,7 @@ footer{padding:26px 0 40px;text-align:center;font-size:12.5px;color:var(--ink3)}
           <div class="nm"><b>${r.icon} ${esc(r.name)}</b><span class="kr">${esc(r.kr)}${r.area ? '｜' + esc(r.area) : ''}</span></div>
           <div class="btns">
             <a class="go gn" href="${nvWeb(r.nvKind, r.nvVal)}" data-nv="${esc(nvTarget(r.nvKind, r.nvVal))}" target="_blank" rel="noopener">NAVER</a>
-            <a class="go gg" href="${gmap(r.g)}" target="_blank" rel="noopener">Google</a>
+            <a class="go gg" href="${gmap(r.g + (r.addr ? ' ' + r.addr : ''))}" target="_blank" rel="noopener">Google</a>
             <button class="ck ${d.n ? 'on' : ''}" data-ck="n">N ${d.n ? '✓' : '已存?'}</button>
             <button class="ck ${d.g ? 'on' : ''}" data-ck="g">G ${d.g ? '✓' : '已存?'}</button>
             ${r.addr ? `<button class="ck ad" data-addr="${esc(r.addr)}" title="複製韓文地址，貼到 Uber／Kakao T 目的地">🚕 ${esc(r.addr)}</button>` : ''}
